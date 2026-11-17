@@ -1,0 +1,38 @@
+[
+  {
+    "action": "view_next",
+    "control": "SW1",
+    "event": "button.sw1.short_press",
+    "label": "确认 / 下一页"
+  },
+  {
+    "action": "view_prev",
+    "control": "SW2",
+    "event": "button.sw2.short_press",
+    "label": "返回 / 上一页"
+  },
+  {
+    "action": "stick_next",
+    "control": "前方摇杆",
+    "event": "joystick.up",
+    "label": "向上翻页"
+  },
+  {
+    "action": "stick_prev",
+    "control": "前方摇杆",
+    "event": "joystick.down",
+    "label": "向下翻页"
+  },
+  {
+    "action": "stick_right",
+    "control": "前方摇杆",
+    "event": "knob.rotate_cw",
+    "label": "向右翻页"
+  },
+  {
+    "action": "stick_left",
+    "control": "前方摇杆",
+    "event": "knob.rotate_ccw",
+    "label": "向左翻页"
+  }
+]

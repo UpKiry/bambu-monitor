@@ -1,0 +1,830 @@
+{
+  "schema_version": 1,
+  "engine": "p4-bounded-runtime-v4",
+  "quota": "p4-quota-v2",
+  "vars": {
+    "remain": {
+      "type": "string",
+      "init": "00:00"
+    },
+    "prog": {
+      "type": "int",
+      "init": 0
+    },
+    "layer": {
+      "type": "int",
+      "init": 0
+    },
+    "layers": {
+      "type": "int",
+      "init": 0
+    },
+    "nozzle": {
+      "type": "int",
+      "init": 0
+    },
+    "bed": {
+      "type": "int",
+      "init": 0
+    },
+    "chamber": {
+      "type": "int",
+      "init": 0
+    },
+    "fan_part": {
+      "type": "int",
+      "init": 0
+    },
+    "fan_aux": {
+      "type": "int",
+      "init": 0
+    },
+    "tray1": {
+      "type": "int",
+      "init": 0
+    },
+    "tray2": {
+      "type": "int",
+      "init": 0
+    },
+    "tray3": {
+      "type": "int",
+      "init": 0
+    },
+    "tray4": {
+      "type": "int",
+      "init": 0
+    }
+  },
+  "states": [
+    "standby"
+  ],
+  "initial_state": "standby",
+  "pages": [
+    {
+      "id": "task"
+    },
+    {
+      "id": "temps"
+    },
+    {
+      "id": "ams"
+    }
+  ],
+  "initial_page": "task",
+  "transitions": [
+    {
+      "on": "view_next",
+      "from": "*",
+      "page": "next"
+    },
+    {
+      "on": "view_prev",
+      "from": "*",
+      "page": "prev"
+    },
+    {
+      "on": "stick_next",
+      "from": "*",
+      "page": "next"
+    },
+    {
+      "on": "stick_prev",
+      "from": "*",
+      "page": "prev"
+    },
+    {
+      "on": "stick_right",
+      "from": "*",
+      "page": "next"
+    },
+    {
+      "on": "stick_left",
+      "from": "*",
+      "page": "prev"
+    }
+  ],
+  "tick": [],
+  "dashboard": {
+    "title": "拓竹打印机",
+    "headline": {
+      "switch_page": {
+        "task": "打印任务 · 等待打印机数据",
+        "temps": "环境温度 · 等待打印机数据",
+        "ams": "AMS 耗材 · 等待打印机数据"
+      }
+    },
+    "note": "打印机数据接入后显示实时读数",
+    "footer": "摇杆翻页   SW1 前进   SW2 返回",
+    "badge": "—",
+    "visualStyle": "clean",
+    "visualPalette": "mono",
+    "visualLayout": "tool",
+    "visualSprite": "gauge"
+  },
+  "surface": {
+    "engine": "p4-app-surface-v1",
+    "graphics": "p4-app-graphics-v1",
+    "bindings": "p4-variable-bindings-v1",
+    "typography": "p4-app-type-v1",
+    "background": 2113,
+    "images": [
+      {
+        "id": "glyphs",
+        "asset": "assets/glyphs.png",
+        "frame_width": 192,
+        "frame_height": 192,
+        "frames": 1,
+        "fps": 1
+      }
+    ],
+    "fonts": [
+      {
+        "image": "glyphs",
+        "chars": "0123456789:%",
+        "metrics": [
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            18,
+            3,
+            26
+          ],
+          [
+            18,
+            3,
+            26
+          ],
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            18,
+            3,
+            26
+          ],
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            18,
+            2,
+            26
+          ],
+          [
+            10,
+            8,
+            26
+          ],
+          [
+            28,
+            2,
+            26
+          ]
+        ],
+        "cell": [
+          48,
+          64
+        ]
+      }
+    ],
+    "elements": [
+      {
+        "type": "text",
+        "x": 26,
+        "y": 10,
+        "w": 300,
+        "h": 22,
+        "color": 63389,
+        "text": "拓竹 A1 mini",
+        "font_size": 16,
+        "weight": 600,
+        "align": "left",
+        "valign": "top"
+      },
+      {
+        "type": "panel",
+        "x": 520,
+        "y": 8,
+        "w": 94,
+        "h": 24,
+        "color": 8452,
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 532,
+        "y": 12,
+        "w": 72,
+        "h": 20,
+        "color": 35953,
+        "text": "等待数据",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top"
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 44,
+        "w": 588,
+        "h": 152,
+        "color": 4259,
+        "radius": 16,
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 60,
+        "w": 200,
+        "h": 20,
+        "color": 35953,
+        "text": "预计剩余",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 82,
+        "w": 320,
+        "h": 40,
+        "color": 63389,
+        "var_bind": "remain",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 128,
+        "w": 18,
+        "h": 20,
+        "color": 35953,
+        "text": "层",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 66,
+        "y": 128,
+        "w": 40,
+        "h": 20,
+        "color": 63389,
+        "var_bind": "layer",
+        "font_size": 16,
+        "weight": 600,
+        "align": "right",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 110,
+        "y": 128,
+        "w": 11,
+        "h": 20,
+        "color": 25355,
+        "text": "/",
+        "font_size": 16,
+        "weight": 400,
+        "align": "center",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 125,
+        "y": 128,
+        "w": 40,
+        "h": 20,
+        "color": 63389,
+        "var_bind": "layers",
+        "font_size": 16,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 514,
+        "y": 128,
+        "w": 42,
+        "h": 20,
+        "color": 35953,
+        "text": "进度",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 558,
+        "y": 128,
+        "w": 26,
+        "h": 20,
+        "color": 63389,
+        "var_bind": "prog",
+        "font_size": 16,
+        "weight": 600,
+        "align": "right",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 588,
+        "y": 128,
+        "w": 20,
+        "h": 20,
+        "color": 35953,
+        "text": "%",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "panel",
+        "x": 44,
+        "y": 160,
+        "w": 552,
+        "h": 12,
+        "color": 14791,
+        "radius": 6,
+        "page": 0
+      },
+      {
+        "type": "meter",
+        "x": 44,
+        "y": 160,
+        "w": 552,
+        "h": 12,
+        "color": 20239,
+        "var_bind": "prog",
+        "radius": 6,
+        "page": 0
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 208,
+        "w": 284,
+        "h": 100,
+        "color": 4259,
+        "radius": 16,
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 224,
+        "w": 220,
+        "h": 20,
+        "color": 35953,
+        "text": "喷嘴温度 °C",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 252,
+        "w": 120,
+        "h": 38,
+        "color": 63389,
+        "var_bind": "nozzle",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "panel",
+        "x": 330,
+        "y": 208,
+        "w": 284,
+        "h": 100,
+        "color": 4259,
+        "radius": 16,
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 348,
+        "y": 224,
+        "w": 220,
+        "h": 20,
+        "color": 35953,
+        "text": "热床温度 °C",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 348,
+        "y": 252,
+        "w": 120,
+        "h": 38,
+        "color": 63389,
+        "var_bind": "bed",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 320,
+        "w": 588,
+        "h": 80,
+        "color": 4259,
+        "radius": 16,
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 336,
+        "w": 240,
+        "h": 20,
+        "color": 35953,
+        "text": "AMS 槽 1 余量 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 360,
+        "w": 60,
+        "h": 34,
+        "color": 63389,
+        "var_bind": "tray1",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "text",
+        "x": 26,
+        "y": 420,
+        "w": 588,
+        "h": 20,
+        "color": 25355,
+        "text": "摇杆翻页   SW1 前进   SW2 返回",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 0
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 46,
+        "w": 588,
+        "h": 92,
+        "color": 4259,
+        "radius": 16,
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 62,
+        "w": 300,
+        "h": 20,
+        "color": 35953,
+        "text": "腔体温度 °C",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 92,
+        "w": 110,
+        "h": 38,
+        "color": 63389,
+        "var_bind": "chamber",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 150,
+        "w": 588,
+        "h": 92,
+        "color": 4259,
+        "radius": 16,
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 166,
+        "w": 300,
+        "h": 20,
+        "color": 35953,
+        "text": "部件风扇 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 196,
+        "w": 110,
+        "h": 38,
+        "color": 63389,
+        "var_bind": "fan_part",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 254,
+        "w": 588,
+        "h": 92,
+        "color": 4259,
+        "radius": 16,
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 270,
+        "w": 300,
+        "h": 20,
+        "color": 35953,
+        "text": "辅助风扇 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 300,
+        "w": 110,
+        "h": 38,
+        "color": 63389,
+        "var_bind": "fan_aux",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "text",
+        "x": 26,
+        "y": 420,
+        "w": 588,
+        "h": 20,
+        "color": 25355,
+        "text": "摇杆翻页   SW1 前进   SW2 返回",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 1
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 46,
+        "w": 588,
+        "h": 80,
+        "color": 4259,
+        "radius": 16,
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 58,
+        "w": 200,
+        "h": 20,
+        "color": 35953,
+        "text": "槽 1 余量 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 84,
+        "w": 90,
+        "h": 36,
+        "color": 63389,
+        "var_bind": "tray1",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 134,
+        "w": 588,
+        "h": 80,
+        "color": 4259,
+        "radius": 16,
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 146,
+        "w": 200,
+        "h": 20,
+        "color": 35953,
+        "text": "槽 2 余量 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 172,
+        "w": 90,
+        "h": 36,
+        "color": 63389,
+        "var_bind": "tray2",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 222,
+        "w": 588,
+        "h": 80,
+        "color": 4259,
+        "radius": 16,
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 234,
+        "w": 200,
+        "h": 20,
+        "color": 35953,
+        "text": "槽 3 余量 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 260,
+        "w": 90,
+        "h": 36,
+        "color": 63389,
+        "var_bind": "tray3",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "panel",
+        "x": 26,
+        "y": 310,
+        "w": 588,
+        "h": 80,
+        "color": 4259,
+        "radius": 16,
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 322,
+        "w": 200,
+        "h": 20,
+        "color": 35953,
+        "text": "槽 4 余量 %",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 44,
+        "y": 348,
+        "w": 90,
+        "h": 36,
+        "color": 63389,
+        "var_bind": "tray4",
+        "font_size": 32,
+        "weight": 600,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      },
+      {
+        "type": "text",
+        "x": 26,
+        "y": 420,
+        "w": 588,
+        "h": 20,
+        "color": 25355,
+        "text": "摇杆翻页   SW1 前进   SW2 返回",
+        "font_size": 16,
+        "weight": 400,
+        "align": "left",
+        "valign": "top",
+        "page": 2
+      }
+    ]
+  }
+}
