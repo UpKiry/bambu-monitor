@@ -1,86 +1,155 @@
-# 拓竹打印机监控 · Bambu Monitor
+# Bambu Monitor · 拓竹打印机监控
 
-ESP32-P4 / PetUI 的 640×480 打印机监控组件，包含打印任务、环境温度、AMS 耗材三个页面。组件 ID 为 `bambu-monitor`，版本 `0.1.6`，运行时为 `p4-bounded-runtime-v4`。
+[![Offline checks](https://github.com/UpKiry/bambu-monitor/actions/workflows/check.yml/badge.svg)](https://github.com/UpKiry/bambu-monitor/actions/workflows/check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](pyproject.toml)
+[![Status: Prototype](https://img.shields.io/badge/Status-Prototype-orange.svg)](#项目状态)
 
-**当前可运行的是显示组件及离线构建工程；真实数据提供器尚未实现。** 现有数值是初始化占位值。工程整理没有接入账号、改动界面、发布组件或同步设备。
+面向 **ESP32-P4 / PetUI** 的 640×480 拓竹打印机监控组件，用三个页面展示打印任务、环境温度和 AMS 耗材信息。
 
-数据接入优先使用 **Bambu Lab 云**；以后实现本地 MQTT。云实时遥测仍使用 MQTT，但连接的是 Bambu 云服务器，不需要连接打印机的局域网地址。
+A Bambu Lab printer dashboard prototype for ESP32-P4 / PetUI, with offline build tools and a provider-independent telemetry contract.
 
-![打印任务页面](design/page1-task.png)
+> **当前是显示原型，尚未连接真实打印机数据。** 页面中的 `00:00` 和 `0` 是初始化占位值。云认证、实时采集和设备变量下发仍在规划中。
 
-## 先读哪些文档
+## 界面预览
 
-| 目的 | 文档 |
-|---|---|
-| 比较可实施方案、决定下一步 | [云端接入方案](docs/CLOUD-OPTIONS.md) |
-| 核对登录、区域、设备列表、云 MQTT 和证据来源 | [云协议研究](docs/CLOUD-PROTOCOL.md) |
-| 理解采集、模型、显示和宿主的职责 | [架构与边界](docs/ARCHITECTURE.md) |
-| 查看 13 个变量和规范化数据规则 | [数据契约与字段映射](docs/DATA-ADAPTER.md) |
-| 安装依赖、检查、构建、预览、打包 | [开发指南](docs/DEVELOPMENT.md) |
-| 后续实施顺序和验收标准 | [路线图](docs/ROADMAP.md) |
-| 了解本次交付实际验证到哪里 | [验证记录](docs/VERIFICATION.md) |
+| 打印任务 | 环境温度 | AMS 耗材 |
+| :---: | :---: | :---: |
+| ![打印任务：剩余时间、层数、进度和温度](design/page1-task.png) | ![环境页面：腔温和风扇占位读数](design/page2-environment.png) | ![AMS 页面：四个槽的余量占位读数](design/page3-ams.png) |
+
+这些图片由离线渲染工具生成，不是实时遥测或设备实拍。
+
+## 项目状态
+
+| 能力 | 状态 |
+| --- | --- |
+| 三页布局、13 个显示变量、六个按键翻页 | 已实现声明结构，实机画面待验收 |
+| 隔离构建、预览、明确文件清单打包 | 已实现 |
+| 数据契约、合成样例、离线检查和 CI 配置 | 已实现；CI 运行结果见上方徽章 |
+| Bambu Cloud 认证、设备发现、云 MQTT 采集 | 待选型和实施 |
+| 自定义界面的实时变量下发 | 待核对 Pet Manager 与固件能力 |
+| 打印机本地 MQTT | 后续计划 |
+
+组件 ID 为 `bambu-monitor`，版本 `0.1.6`，运行时为 `p4-bounded-runtime-v4`。现有 [组件包](dist/bambu-monitor-0.1.6.hachiapp)是显示原型，不包含云端数据提供器。
+
+## 数据接入方向
+
+优先接入 **Bambu Lab 云**，以后再增加本地 MQTT。云端路线中，HTTP 用于认证、设备发现和任务元数据，**云 MQTT** 用于实时遥测；它不要求电脑连接打印机的局域网 MQTT。
+
+```text
+Bambu Cloud HTTP + MQTT ──┐
+Home Assistant 云桥接 ────┼─→ 数据提供器 → 统一快照 → 宿主适配 → PetUI 显示
+打印机 LAN MQTT（后续）───┘
+```
+
+上图是计划中的数据流，尚未端到端接通。三种候选路线为：
+
+- **独立云适配器**：自行维护认证、云 MQTT、消息解析和重连，适合独立分发。
+- **封装 pybambu**：固定 ha-bambulab 的内部模块版本，复用认证与机型解析，需要维护封装和依赖。
+- **Home Assistant 桥接**：HA 连接 Bambu Cloud，项目读取 HA 实体，适合已有 HA 的环境。
+
+详细成本和取舍见 [云端接入方案](docs/CLOUD-OPTIONS.md)。相关云协议由社区源码核实，并非官方稳定开放 API；区域、验证码/MFA 和 token 失效处理见 [协议研究](docs/CLOUD-PROTOCOL.md)。
+
+统一模型区分有效 `0`、未知、不支持与过期，云和未来本地提供器复用同一契约。当前宿主的列表快照能力不能直接证明支持自定义界面变量更新，设备接入需单独验证。
 
 ## 快速开始
 
-要求 Python 3.11+；推荐独立虚拟环境。以下命令仅处理本地工程，不登录云账号：
+开发工具要求 **Python 3.11+**。仅做本地检查、构建和预览，不需要打印机、Bambu 账号或 Pet Manager。
 
 ```bash
+git clone https://github.com/UpKiry/bambu-monitor.git
+cd bambu-monitor
+
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e '.[dev]'
+
 python tools/project.py check
 python tools/project.py build
 ```
 
-Windows 使用 `.venv\Scripts\Activate.ps1` 激活；也可直接调用虚拟环境内的 Python。Make 是可选快捷方式，不是构建依赖。
+Windows PowerShell 使用 `.venv\Scripts\Activate.ps1` 激活；也可直接调用虚拟环境里的 Python。
+
+### 预览
 
 ```bash
-python tools/project.py preview  # 需要中文字体，输出到 .build/
-python tools/project.py pack    # 需要本机 PetUI，打包并校验；不会发布
+python tools/project.py preview
 ```
 
-具体字体、PetUI 路径和产物位置见 [开发指南](docs/DEVELOPMENT.md)。普通构建复用已经提交的字模，不因电脑不同而重建字体。
+默认输出三张图片到 `.build/preview/`，需要本机可用的中文字体。macOS / Linux 支持自动查找，也可以手动指定：
+
+```bash
+python tools/project.py preview --font /path/to/cjk-font.ttc
+```
+
+Linux 可安装 `fonts-noto-cjk`。跨平台中文字形可能不同；普通构建复用仓库中的字模，只有显式执行 `glyphs` 才会重建它。
+
+### 打包到设备组件
+
+打包需要单独安装 Pet Manager 维护的 PetUI CLI：
+
+```bash
+python tools/project.py pack
+# 或指定工具位置
+python tools/project.py pack --petui /path/to/petui
+```
+
+输出为 `.build/bambu-monitor-0.1.6.hachiapp`，命令会调用官方打包器和校验器，不自动发布或同步。可在 Pet Manager 组件中心导入包，再打开同一组件卡片执行“保存并同步”；同步前须满足目标设备能力要求。
+
+构建仅收录明确清单内的组件文件，源码、测试、示例和凭据不会随组件打包。更多参数、字体与基线更新方式见 [开发指南](docs/DEVELOPMENT.md)。
+
+## 交互
+
+| 输入 | 行为 |
+| --- | --- |
+| 摇杆上 / 右、SW1 | 下一页 |
+| 摇杆下 / 左、SW2 | 上一页 |
+
+三个页面循环切换。退出由设备全局设置负责，组件不占用 SW3。关键读数布局结束于 y ≤ 400，中文正文保持 16 px，大号数字使用字模图集；裁切、字体和颜色仍需实机验证。
 
 ## 工程结构
 
 ```text
 bambu-monitor/
-├── package/                 # 已提交的组件资源和生成后的 JSON 基线
-├── tools/                   # 布局生成、工程入口、预览与离线检查
-├── schemas/                 # 待实现数据提供器的内部 JSON Schema
-├── examples/                # 合成快照、配置设计样例，均不作为实时数据
-├── tests/                   # 离线契约测试
-├── docs/                    # 架构、云端选型、开发、验收文档
-├── design/                  # 现有界面参考帧
-├── dist/                    # 原有 0.1.6 包，本次未更新
-├── .github/workflows/       # 离线工程检查配置
-├── .build/                  # 新构建和预览产物，不提交
-├── pyproject.toml
-└── Makefile
+├── package/       # 组件资源与生成 JSON 基线
+├── tools/         # 统一入口、布局生成、预览和检查
+├── schemas/       # 来源无关的内部数据契约
+├── examples/      # 合成快照与配置设计示例
+├── tests/         # 离线契约测试
+├── docs/          # 架构、协议、方案、开发与验证记录
+├── design/        # 三页离线参考图
+├── dist/          # 已有组件包
+└── .github/       # CI 配置
 ```
 
-布局和变量的生成逻辑在 [构建脚本](tools/build_package.py)；[组件资源](package/runtime/widget.json)保留为可比对基线。修改布局时先改生成逻辑，通过检查后再按 [开发指南](docs/DEVELOPMENT.md)更新基线。目录中的用户重复副本不自动删除；打包使用显式清单，避免误收录。
+默认产物进入 `.build/`，不覆盖正式组件资源。布局与变量由 [生成脚本](tools/build_package.py)维护，[运行清单](package/runtime/widget.json)用于基线比对；[统一入口](tools/project.py)负责开发命令。
 
-## 已实现与待实现
+## 文档
 
-| 项目 | 当前状态 |
-|---|---|
-| 三页 UI、13 个变量绑定、六个按键翻页 | 已有组件结构；实机画面仍待验收 |
-| 可移植构建入口、明确打包清单、离线检查 | 本次工程化范围，执行结果见验证记录 |
-| 统一数据模型、样例、缺测/过期语义 | 已定义内部契约；尚无数据采集器 |
-| 云登录、设备发现、云 MQTT、私有凭据存储 | 待方案选择后实施 |
-| 本地 MQTT | 后续提供器，保留模型兼容位置 |
-| 自定义 surface 的实时变量下发 | 待核对宿主和固件能力；现有列表协议不能直接证明支持 |
-| 新版数据状态 UI、发布、USB 同步、设备端验收 | 尚未进行 |
+| 文档 | 内容 |
+| --- | --- |
+| [云端接入方案](docs/CLOUD-OPTIONS.md) | 三种路线、成本假设和选型验证 |
+| [云协议研究](docs/CLOUD-PROTOCOL.md) | 区域、认证、设备接口、MQTT 与固定版本证据 |
+| [架构与边界](docs/ARCHITECTURE.md) | 采集、缓存、显示投影与设备宿主的职责 |
+| [数据契约](docs/DATA-ADAPTER.md) | 字段映射、增量、缺测与过期规则 |
+| [开发指南](docs/DEVELOPMENT.md) | 环境、检查、构建、预览、打包 |
+| [路线图](docs/ROADMAP.md) | 后续实施顺序及验收条件 |
+| [验证记录](docs/VERIFICATION.md) | 已执行的检查和未验证的真实链路 |
 
-## 交互和设备约束
+## 测试与贡献
 
-摇杆上下、左右均可翻页；SW1 向前，SW2 返回。三个页面循环切换。退出由设备全局设置负责，组件不占用 SW3。
+```bash
+python tools/project.py check
+```
 
-保留原项目的屏幕约束：中文正文 16 px，大号数字使用字模图集；关键读数结束于 y ≤ 400；进度条有独立轨道。现有布局见 [构建脚本](tools/build_package.py)，设备裁切、字体效果和颜色仍需真机验证。
+检查覆盖生成一致性、13 个变量绑定、三页 × 六输入的 18 条翻页路径、PNG 资源、JSON Schema 和数据契约测试。它不连接云端、打印机或 USB，也不代表实机验收通过。GitHub Actions 在 Ubuntu / Python 3.11、3.12、3.13 上运行离线构建、检查和预览。
 
-## 凭据和发布边界
+欢迎通过 Issue 或 Pull Request 参与。报告兼容问题时请附 Python / 操作系统版本，以及相关机型、固件和脱敏错误；提交代码前运行检查，说明改动目的与验证方式。界面改动请附预览，保持生成逻辑与组件基线一致。
 
-账号密码、验证码、云 token 和本地访问码应由后续 PC 提供器私有管理，不进入组件、样例或日志。当前不需要填写任何真实凭据。[配置样例](examples/provider.example.toml)仅用于讨论配置设计，没有加载器。
+不要在 Issue、PR、日志或组件中提交密码、验证码、云 token、LAN Access Code 或原始账户响应。[配置示例](examples/provider.example.toml)只用于设计讨论，当前没有配置加载器。
 
-打包、校验、本地导入、设备同步、实机运行是不同阶段。本次不发布新版本。今后修改仍复用组件 ID `bambu-monitor`；本地发布后，需要在 Pet Manager 的同一组件卡片执行“保存并同步”才能替换设备内容。
+## 开源协议
+
+本项目自行编写的代码和文档采用 [MIT License](LICENSE)，允许使用、修改和再分发，保留版权与许可声明即可。依赖、系统字体及第三方参考遵循各自许可，详见 [第三方说明](THIRD_PARTY_NOTICES.md)。
+
+Bambu Lab / 拓竹等名称和商标属于其权利人。本项目是独立社区项目，与 Bambu Lab 没有官方隶属或背书关系。

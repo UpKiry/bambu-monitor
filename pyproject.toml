@@ -1,13 +1,22 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "bambu-monitor"
 version = "0.1.6"
 description = "Offline build tools for the Bambu monitor PetUI component"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [{name = "UpKiry"}]
 requires-python = ">=3.11"
 dependencies = ["Pillow>=10,<13"]
+
+[project.urls]
+Homepage = "https://github.com/UpKiry/bambu-monitor"
+Repository = "https://github.com/UpKiry/bambu-monitor"
+Issues = "https://github.com/UpKiry/bambu-monitor/issues"
 
 [project.optional-dependencies]
 dev = ["jsonschema>=4.23,<5", "rfc3339-validator>=0.1.4,<0.2"]
