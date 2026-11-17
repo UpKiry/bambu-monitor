@@ -26,7 +26,7 @@ A Bambu Lab printer dashboard prototype for ESP32-P4 / PetUI, with offline build
 | 三页布局、13 个显示变量、六个按键翻页 | 已实现声明结构，实机画面待验收 |
 | 隔离构建、预览、明确文件清单打包 | 已实现 |
 | 数据契约、合成样例、离线检查和 CI 配置 | 已实现；CI 运行结果见上方徽章 |
-| Bambu Cloud 认证、设备发现、云 MQTT 采集 | 待选型和实施 |
+| Bambu Cloud 认证、设备发现、云 MQTT 采集 | 已选择方案 A（自研），需求和计划已整理，实现待开始 |
 | 自定义界面的实时变量下发 | 待核对 Pet Manager 与固件能力 |
 | 打印机本地 MQTT | 后续计划 |
 
@@ -34,23 +34,20 @@ A Bambu Lab printer dashboard prototype for ESP32-P4 / PetUI, with offline build
 
 ## 数据接入方向
 
-优先接入 **Bambu Lab 云**，以后再增加本地 MQTT。云端路线中，HTTP 用于认证、设备发现和任务元数据，**云 MQTT** 用于实时遥测；它不要求电脑连接打印机的局域网 MQTT。
+**已选择方案 A：自研 Bambu Cloud 适配器。** 优先实现云认证、设备发现和云 MQTT 遥测，以后增加本地 MQTT。云端 HTTP 用于认证和元数据，云 MQTT 用于实时状态，不要求电脑连接打印机的局域网 MQTT。
 
 ```text
-Bambu Cloud HTTP + MQTT ──┐
-Home Assistant 云桥接 ────┼─→ 数据提供器 → 统一快照 → 宿主适配 → PetUI 显示
-打印机 LAN MQTT（后续）───┘
+Bambu Cloud HTTP + 云 MQTT → 自研采集器 → 统一快照 → Pet Manager宿主适配 → PetUI显示
+打印机 LAN MQTT（后续）───────────────────┘
 ```
 
-上图是计划中的数据流，尚未端到端接通。三种候选路线为：
+这是待实现的数据流。先完成 M0 宿主/13变量能力核实，并行推进 M1 离线采集核心，再分别验收认证、云订阅、宿主传输和实机显示。Python 是计划中的参考采集器运行时，不在组件包或 ESP32 内执行。
 
-- **独立云适配器**：自行维护认证、云 MQTT、消息解析和重连，适合独立分发。
-- **封装 pybambu**：固定 ha-bambulab 的内部模块版本，复用认证与机型解析，需要维护封装和依赖。
-- **Home Assistant 桥接**：HA 连接 Bambu Cloud，项目读取 HA 实体，适合已有 HA 的环境。
+从 [需求规格](docs/REQUIREMENTS.md)、[实施计划](docs/IMPLEMENTATION-PLAN.md)与 [验收矩阵](docs/ACCEPTANCE.md)阅读；准备在新对话实施时使用 [交接文档](docs/HANDOFF.md)。B（pybambu）和 C（HA）的 [历史比较](docs/CLOUD-OPTIONS.md)保留供追溯，不再作为待选项。
 
-详细成本和取舍见 [云端接入方案](docs/CLOUD-OPTIONS.md)。相关云协议由社区源码核实，并非官方稳定开放 API；区域、验证码/MFA 和 token 失效处理见 [协议研究](docs/CLOUD-PROTOCOL.md)。
+相关云协议由社区源码核实，并非官方稳定开放 API；区域、验证码/MFA和token失效处理见 [协议研究](docs/CLOUD-PROTOCOL.md)。
 
-统一模型区分有效 `0`、未知、不支持与过期，云和未来本地提供器复用同一契约。当前宿主的列表快照能力不能直接证明支持自定义界面变量更新，设备接入需单独验证。
+统一模型区分有效 `0`、未知、不支持与过期。已有composition/bridge适配器限制为8项，PC fetch则是每来源8项且不适合私网鉴权；当前13变量与质量状态需要独立核对宿主及目标设备支持，不能只靠声明配额推断。
 
 ## 快速开始
 
@@ -128,7 +125,11 @@ bambu-monitor/
 
 | 文档 | 内容 |
 | --- | --- |
-| [云端接入方案](docs/CLOUD-OPTIONS.md) | 三种路线、成本假设和选型验证 |
+| [需求规格](docs/REQUIREMENTS.md) | 方案 A 的目标、MVP范围、功能与非功能需求 |
+| [实施计划](docs/IMPLEMENTATION-PLAN.md) | 架构决策、宿主证据、M0–M6及阶段退出条件 |
+| [验收矩阵](docs/ACCEPTANCE.md) | FR/NFR对应的离线、云端与实机验证 |
+| [新会话交接](docs/HANDOFF.md) | 已选决策、环境、已知缺口和可复制的启动消息 |
+| [云端接入历史比较](docs/CLOUD-OPTIONS.md) | 三种路线及选择 A 的记录 |
 | [云协议研究](docs/CLOUD-PROTOCOL.md) | 区域、认证、设备接口、MQTT 与固定版本证据 |
 | [架构与边界](docs/ARCHITECTURE.md) | 采集、缓存、显示投影与设备宿主的职责 |
 | [数据契约](docs/DATA-ADAPTER.md) | 字段映射、增量、缺测与过期规则 |

@@ -1,8 +1,8 @@
 # 设计示例：当前工程不读取此配置，没有可运行的提供器。
-# 实现方案选定后再增加配置加载器；不要填入密码、token、验证码或 LAN code。
+# 方案 A 已确定，加载器在后续实施；不要填入密码、token、验证码或 LAN code。
 
 [provider]
-kind = "bambu-cloud"  # 本阶段优先；未来可实现 bambu-lan / home-assistant
+kind = "bambu-cloud"  # 已选 A；本阶段不实现 bambu-lan / home-assistant
 region = "cn"         # cn 或 global；按 Bambu 账号区域，不按电脑位置
 printer_id = ""       # 登录并列出 devices 后由用户选择，不能默认选第一台
 
@@ -11,6 +11,8 @@ reference = "bambu-monitor/cloud/default"  # 系统密钥库条目的逻辑名�
 
 [freshness]
 # 设计初值，尚未用真实设备验收，不代表云端固定推送频率。
+# 此参数名称待实现时核定：仅描述目标设备活跃证据超时，不能作所有字段TTL。
+# 稳定字段按protocol profile、generation/baseline和任务/耗材身份判断有效性。
 stale_after_seconds = 60
 
 [reconnect]
@@ -20,6 +22,7 @@ jitter = true
 # 凭据被拒绝时进入 auth_required，不无限重试登录或自动重复发验证码。
 
 [output]
-# 后续若实现独立服务，只绑定loopback；Pet Manager对接另做能力验证。
+# 只有 M0 选定独立服务时才考虑此候选；首版先提供CLI/快照输出。
+# bind 不意味着已有HTTP服务；若实现也默认限制loopback，受控IPC/鉴权另设计。
 bind = "127.0.0.1"
-# 尚未分配 HTTP 路由或实现服务，不把它当作当前可访问的 API。
+# 尚未分配HTTP路由或实现服务，不把它当作当前可访问的API。

@@ -2,15 +2,13 @@
 
 ## 当前工程做什么
 
-当前工程负责一个 PetUI 显示组件和离线构建，不是已经运行的打印机数据服务。云端与本地采集方式尚未选定，不能从包中取得真实数据。具体状态见 [验证记录](VERIFICATION.md)。
+当前工程负责一个PetUI显示组件和离线构建，数据提供器尚未实现。**已选择A自研Bambu Cloud适配器**；B/pybambu和C/HA为历史备选，本地MQTT后续再做。执行入口见 [需求](REQUIREMENTS.md)、[计划](IMPLEMENTATION-PLAN.md)与 [验收](ACCEPTANCE.md)，已有工程验证见 [历史记录](VERIFICATION.md)。
 
 ```mermaid
 flowchart LR
-    Cloud["Bambu Cloud HTTP + MQTT"] --> CP["云提供器 · 待实现"]
-    HA["Home Assistant · 可选方案"] --> HP["HA 提供器 · 待实现"]
+    Cloud["Bambu Cloud HTTP + 云 MQTT"] --> CP["自研云提供器 A · 待实现"]
     LAN["打印机 LAN MQTT · 后续"] --> LP["本地提供器 · 待实现"]
     CP --> Model["统一快照 · 契约已定义"]
-    HP --> Model
     LP --> Model
     Model --> Export["可选本机 JSON / 事件出口 · 待实现"]
     Model --> Projection["PetUI 投影和宿主适配 · 待验证"]
@@ -36,7 +34,7 @@ unconfigured → auth_required → connecting → online
 凭据失效：任意已认证状态 → auth_required（由用户重新认证）
 ```
 
-`online` 必须有目标打印机的有效遥测依据，不能只凭 broker CONNACK。恢复连接后只在收到新消息的字段上更新时间；没有更新的字段继续老化。
+`online` 必须有目标打印机的有效遥测依据，不能只凭broker CONNACK。恢复连接后，实际出现的字段才更新其观测时间；未出现字段保留旧值和旧时间，但是否仍valid要结合协议profile、代次、基线和任务/耗材作用域判断，不能一律按60秒无变化失效。详见 [FR-08](REQUIREMENTS.md)。
 
 ### 2. 状态缓存和统一快照
 
@@ -56,15 +54,17 @@ unconfigured → auth_required → connecting → online
 
 旧文档把 `widget/data` 当作任意变量更新通道，这一点不能成立为已确认能力。本机 PetUI 技能的实时数据文档描述的是有界 rows 列表快照；当前组件使用自定义 surface 和 `var_bind`，不能直接套用列表行协议。
 
-所有云方案均需共同完成一次宿主能力验证：
+本机PetUI 0.1.232参考中存在`app/snapshot`变量投影路径；对应production源码、实际设备协商和13变量接收尚未核实。离线校验器已确认composition总变量≤8、service bridge绑定≤8；PC fetch是每来源8项，拆8＋5可过声明校验，但其不支持Authorization、本机HTTP/私网且轮询≥60秒，不能直接消费本项目的私有实时采集器。
 
-1. 读取真实 Pet Manager 与设备协商能力。
-2. 核对是否已有通用的 host/service 字段到 surface 变量映射，而非只支持 rows。
-3. 用真实采集快照验证一个标量和缺测状态，再扩大到全部字段。
-4. 若缺少通用映射，需要另行确定 Pet Manager/固件代码范围；不能靠新增 `data.source="bambu.printer"` 声称接通。
-5. USB 写入复用宿主传输管理，不能由采集进程抢占串口。
+M0按 [实施计划](IMPLEMENTATION-PLAN.md)执行：
 
-本次没有该产品源码的修改和实机能力核验。若先做独立本机 JSON 服务，它可以验证采集结果，但不等于屏幕已刷新。
+1. 读取目标Pet Manager与设备实际能力，核对真实宿主源码、快照和传输预算。
+2. 用明确标记的离线合成快照检查单标量、实例身份、断连和迟到消息，不冒充实时云数据。
+3. 验证完整13项及质量状态的预算和接收，不能因v2一般16vars就认定宿主路径已支持。
+4. 若需外部产品修改，先列出具体源码和授权范围，不直接改安装应用、技能或固件，不默降UI。
+5. USB复用宿主传输管理。M0缺少设备或源码时继续M1离线核心，分别记录未验证条件。
+
+仅有PC快照输出不等于屏幕刷新；真实云和实机链路在后续阶段分别验收。
 
 ## 仓库与生成边界
 
@@ -72,12 +72,12 @@ unconfigured → auth_required → connecting → online
 - [工程入口](../tools/project.py)：检查、受控构建、预览、打包；普通构建写入 `.build/`。
 - [Schema](../schemas/printer-snapshot.schema.json)和[样例](../examples/snapshot.cloud.example.json)：只在 PC 开发/测试使用，不打入组件。
 - [配置设计样例](../examples/provider.example.toml)：尚无加载器，所有参数都是设计阶段输入。
-- 后续选定云方案后再建立 `src/` 提供器与 CLI，避免现在放入不可用的登录或连接桩。
+- 方案A已确定，下一会话按 [实施计划](IMPLEMENTATION-PLAN.md)建立真正可运行、可测试的`src/`采集器与CLI，不先堆放不可用桩。
 
-不改组件 ID、版本和视觉布局，不自动清理用户副本，不覆盖原有发布包。本次工程检查与正式 PetUI 解释器、设备验收的关系见 [开发指南](DEVELOPMENT.md)。
+本轮文档准备不改组件ID、版本和视觉布局，不自动清理用户副本，不覆盖原有发布包。本次工程检查与正式PetUI解释器、设备验收的关系见 [开发指南](DEVELOPMENT.md)。
 
 ## 安全和运行边界
 
-密钥存储优先使用操作系统凭据库；如后续提供文件回退，须显式实现私有权限和迁移策略。日志只记录事件类型、错误类别、重试时间，不打印完整账户响应、认证头、消息凭据或全量 payload。Schema 拒绝额外凭据字段只能约束出口结构，不能代替实际代码脱敏。
+密钥优先使用系统凭据库，不可用时首版默认仅会话内存；不自动回退明文文件。日志仅记录脱敏事件、错误类别和重试时间，不输出完整账户响应、认证头或原始payload。Schema拒绝额外字段不能替代实际脱敏。
 
-未来独立服务默认仅监听 loopback；跨设备访问、公开 HTTPS 中转、认证和部署策略需要另行确定。不直接把用户实时打印数据发布到公共 URL。设备直接连接云 MQTT、在设备保存账号 token、本次接入本地 MQTT 均不在本阶段。
+首版提供本地诊断/快照输出，不预设HTTP/SSE路由。M0若选独立服务入口，才定义受控IPC、访问鉴权和生命周期，默认限制同机；跨机NAS/公开HTTPS是后续部署范围。不把token放进组件或设备，不直接公开用户遥测，本阶段不接本地MQTT。
