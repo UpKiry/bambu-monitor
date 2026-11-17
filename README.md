@@ -31,6 +31,8 @@ bambu-monitor/
 │   ├── build_glyph_atlas.py     # 生成字模图集与度量
 │   ├── render_frames.py         # 按固件语义渲染预览帧
 │   ├── make_cover.py            # 首屏渲染帧 → pc/cover.png
+│   ├── check_bindings.py        # 断言每个按键都真的翻页，不然退出码非 0
+│   ├── diagnose_fonts.py        # 解释中文字号与数字字模的高度差
 │   └── glyph_metrics.json       # 图集产物的度量副文件
 ├── design/               # 当前渲染帧（非手绘稿）
 ├── dist/                 # 构建产出的 .hachiapp
