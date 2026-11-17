@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bambu-monitor"
+version = "0.1.6"
+description = "Offline build tools for the Bambu monitor PetUI component"
+requires-python = ">=3.11"
+dependencies = ["Pillow>=10,<13"]
+
+[project.optional-dependencies]
+dev = ["jsonschema>=4.23,<5", "rfc3339-validator>=0.1.4,<0.2"]
+
+[tool.setuptools]
+packages = []

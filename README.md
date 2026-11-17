@@ -1,101 +1,86 @@
-# 拓竹打印机监控 · PetUI 桌搭子组件
+# 拓竹打印机监控 · Bambu Monitor
 
-ESP32-P4 桌面组件的原型：在 640×480 屏上显示拓竹（Bambu Lab）3D 打印机的
-剩余时间、进度、层数、喷嘴/热床温度、风扇和 AMS 各槽余量。
+ESP32-P4 / PetUI 的 640×480 打印机监控组件，包含打印任务、环境温度、AMS 耗材三个页面。组件 ID 为 `bambu-monitor`，版本 `0.1.6`，运行时为 `p4-bounded-runtime-v4`。
 
-**当前状态：结构完成，数据未接入。** 所有读数是占位值（`00:00` / `0`），
-因为 PetUI 契约禁止在没有真实数据源时伪造实时数值。数据通道的两种可行方案见
-[docs/DATA-ADAPTER.md](docs/DATA-ADAPTER.md)。
+**当前可运行的是显示组件及离线构建工程；真实数据提供器尚未实现。** 现有数值是初始化占位值。工程整理没有接入账号、改动界面、发布组件或同步设备。
 
-- 组件 ID：`bambu-monitor`
-- 版本：`0.1.6`
-- 类型：`tool`
-- 运行时：`p4-bounded-runtime-v4`
+数据接入优先使用 **Bambu Lab 云**；以后实现本地 MQTT。云实时遥测仍使用 MQTT，但连接的是 Bambu 云服务器，不需要连接打印机的局域网地址。
 
-![首屏](design/page1-task.png)
+![打印任务页面](design/page1-task.png)
 
-## 目录结构
+## 先读哪些文档
 
-```
-bambu-monitor/
-├── package/              # 可打包的组件源，唯一真相
-│   ├── component.json
-│   ├── negative-screen.json
-│   ├── buttons.json
-│   ├── share.json
-│   ├── runtime/widget.json
-│   ├── assets/glyphs.png        # 数字字模图集
-│   └── pc/cover.png             # 组件卡片封面
-├── tools/
-│   ├── build_package.py         # 生成 package/*.json（布局声明在这里）
-│   ├── build_glyph_atlas.py     # 生成字模图集与度量
-│   ├── render_frames.py         # 按固件语义渲染预览帧
-│   ├── make_cover.py            # 首屏渲染帧 → pc/cover.png
-│   ├── check_bindings.py        # 断言每个按键都真的翻页，不然退出码非 0
-│   ├── diagnose_fonts.py        # 解释中文字号与数字字模的高度差
-│   └── glyph_metrics.json       # 图集产物的度量副文件
-├── design/               # 当前渲染帧（非手绘稿）
-├── dist/                 # 构建产出的 .hachiapp
-└── docs/
-    └── DATA-ADAPTER.md   # 变量 ↔ 打印机字段映射，接入时照此填
-```
+| 目的 | 文档 |
+|---|---|
+| 比较可实施方案、决定下一步 | [云端接入方案](docs/CLOUD-OPTIONS.md) |
+| 核对登录、区域、设备列表、云 MQTT 和证据来源 | [云协议研究](docs/CLOUD-PROTOCOL.md) |
+| 理解采集、模型、显示和宿主的职责 | [架构与边界](docs/ARCHITECTURE.md) |
+| 查看 13 个变量和规范化数据规则 | [数据契约与字段映射](docs/DATA-ADAPTER.md) |
+| 安装依赖、检查、构建、预览、打包 | [开发指南](docs/DEVELOPMENT.md) |
+| 后续实施顺序和验收标准 | [路线图](docs/ROADMAP.md) |
+| 了解本次交付实际验证到哪里 | [验证记录](docs/VERIFICATION.md) |
 
-## 构建
+## 快速开始
 
-需要 Python 3 与 Pillow。
+要求 Python 3.11+；推荐独立虚拟环境。以下命令仅处理本地工程，不登录云账号：
 
 ```bash
-P=python3
-
-$P tools/build_glyph_atlas.py   # 图集 + 度量
-$P tools/build_package.py       # 生成 package/*.json
-$P tools/render_frames.py       # 渲染 design/*.png
-$P tools/make_cover.py          # 首屏 → package/pc/cover.png
-
-petui pack    package dist/bambu-monitor-0.1.6.hachiapp
-petui validate dist/bambu-monitor-0.1.6.hachiapp
-petui publish dist/bambu-monitor-0.1.6.hachiapp
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e '.[dev]'
+python tools/project.py check
+python tools/project.py build
 ```
 
-`petui` 位于 `~/.claw-pet/authoring/petui`。
+Windows 使用 `.venv\Scripts\Activate.ps1` 激活；也可直接调用虚拟环境内的 Python。Make 是可选快捷方式，不是构建依赖。
 
-## 交互
+```bash
+python tools/project.py preview  # 需要中文字体，输出到 .build/
+python tools/project.py pack    # 需要本机 PetUI，打包并校验；不会发布
+```
 
-| 输入 | 事件 | 行为 |
-|---|---|---|
-| 摇杆上 / 下 | `joystick.up` / `joystick.down` | 下一页 / 上一页 |
-| 摇杆左 / 右 | `knob.rotate_ccw` / `knob.rotate_cw` | 上一页 / 下一页 |
-| SW1 | `button.sw1.short_press` | 确认 / 前进 |
-| SW2 | `button.sw2.short_press` | 返回 / 后退 |
+具体字体、PetUI 路径和产物位置见 [开发指南](docs/DEVELOPMENT.md)。普通构建复用已经提交的字模，不因电脑不同而重建字体。
 
-SW3 不绑定：退出由设备全局设置负责。
+## 工程结构
 
-三个页面：**打印任务** → **环境温度** → **AMS 耗材**，循环切换。
+```text
+bambu-monitor/
+├── package/                 # 已提交的组件资源和生成后的 JSON 基线
+├── tools/                   # 布局生成、工程入口、预览与离线检查
+├── schemas/                 # 待实现数据提供器的内部 JSON Schema
+├── examples/                # 合成快照、配置设计样例，均不作为实时数据
+├── tests/                   # 离线契约测试
+├── docs/                    # 架构、云端选型、开发、验收文档
+├── design/                  # 现有界面参考帧
+├── dist/                    # 原有 0.1.6 包，本次未更新
+├── .github/workflows/       # 离线工程检查配置
+├── .build/                  # 新构建和预览产物，不提交
+├── pyproject.toml
+└── Makefile
+```
 
-## 设备约束（都是实测出来的，改布局前请先读）
+布局和变量的生成逻辑在 [构建脚本](tools/build_package.py)；[组件资源](package/runtime/widget.json)保留为可比对基线。修改布局时先改生成逻辑，通过检查后再按 [开发指南](docs/DEVELOPMENT.md)更新基线。目录中的用户重复副本不自动删除；打包使用显式清单，避免误收录。
 
-这几条每一条都来自真机照片暴露的缺陷，不是推测：
+## 已实现与待实现
 
-1. **正文是 16 px 原生中文点阵。** 16 px 清晰；放大到 26–46 px 是把点阵拉伸，
-   边缘会发虚。所以所有中文标签固定 16 px。
-2. **大号数字走字模图集，且只能用整数倍缩放。** 图集格高 64 px，绘制尺寸只能是
-   64 或 32。26/64、21/64 这类非整数倍会让像素不对齐，字看起来是糊的。
-3. **文本从盒子顶部对齐，不是垂直居中。** 早先按居中排版，结果整屏内容下移、
-   底部被裁。
-4. **可用高度小于 480。** 实测底边约 40–100 px 会被裁掉。当前约定：除底部提示行
-   外，所有内容必须结束于 y ≤ 400（`build_package.py` 里有断言）。
-5. **meter 只画填充部分。** 进度 0 % 时填充宽度是 0 像素，等于什么都没画。
-   所以必须有独立的 panel 当轨道，否则进度条看起来像没渲染。
+| 项目 | 当前状态 |
+|---|---|
+| 三页 UI、13 个变量绑定、六个按键翻页 | 已有组件结构；实机画面仍待验收 |
+| 可移植构建入口、明确打包清单、离线检查 | 本次工程化范围，执行结果见验证记录 |
+| 统一数据模型、样例、缺测/过期语义 | 已定义内部契约；尚无数据采集器 |
+| 云登录、设备发现、云 MQTT、私有凭据存储 | 待方案选择后实施 |
+| 本地 MQTT | 后续提供器，保留模型兼容位置 |
+| 自定义 surface 的实时变量下发 | 待核对宿主和固件能力；现有列表协议不能直接证明支持 |
+| 新版数据状态 UI、发布、USB 同步、设备端验收 | 尚未进行 |
 
-## 已知未完成
+## 交互和设备约束
 
-- **数据源未接入。** 组件不联网、不含 URL 或凭据。
-- **实机画面未验收通过。** 裁切量、字模图集是否真的被设备采用、颜色通道是否
-  与预期一致，都还需要在真机上看过才算确认。
-- `dist/` 里的包与本地组件库中的 0.1.6 内容一致（封面已比对相同）。
+摇杆上下、左右均可翻页；SW1 向前，SW2 返回。三个页面循环切换。退出由设备全局设置负责，组件不占用 SW3。
 
-## 版本说明
+保留原项目的屏幕约束：中文正文 16 px，大号数字使用字模图集；关键读数结束于 y ≤ 400；进度条有独立轨道。现有布局见 [构建脚本](tools/build_package.py)，设备裁切、字体效果和颜色仍需真机验证。
 
-`0.1.5` / `0.1.6` 是修 bug 的版本号（用户要求把之前的 0.5.0 回退）。组件库里
-仍保留 `0.1.0` 与 `0.1.6`；更早的 0.2.0–0.5.0 已移到 `~/.claw-pet/components/.trash`，
-避免客户端按语义化版本选中旧画面。
+## 凭据和发布边界
+
+账号密码、验证码、云 token 和本地访问码应由后续 PC 提供器私有管理，不进入组件、样例或日志。当前不需要填写任何真实凭据。[配置样例](examples/provider.example.toml)仅用于讨论配置设计，没有加载器。
+
+打包、校验、本地导入、设备同步、实机运行是不同阶段。本次不发布新版本。今后修改仍复用组件 ID `bambu-monitor`；本地发布后，需要在 Pet Manager 的同一组件卡片执行“保存并同步”才能替换设备内容。

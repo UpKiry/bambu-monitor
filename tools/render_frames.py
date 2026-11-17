@@ -1,101 +1,118 @@
 #!/usr/bin/env python3
-"""Render the declared surface the way the firmware draws it.
+"""Render offline previews with the checked-in atlas and an installed CJK font.
 
-This is a local preview, not a device capture. It mirrors the element rules from
-package/runtime/widget.json: page filter, top-anchored text, integer atlas
-scaling, and -- importantly -- a meter painting only its filled portion.
-
-Two bugs this preview previously had, both of which hid real defects:
-  * it centred text vertically, while the device anchors to the top of the box;
-  * it filled the whole meter, so the real "bar invisible at 0 %" never showed.
+This approximates the declared surface; it is not a firmware/device capture.
 """
+import argparse
 import json
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
+try:
+    from .fonts import resolve_font
+except ImportError:
+    from fonts import resolve_font
+
 ROOT = Path(__file__).resolve().parent.parent
-PKG = ROOT / "package"
-OUT = ROOT / "design"
-CJK_PATH = "/System/Library/Fonts/Hiragino Sans GB.ttc"
-
-runtime = json.loads((PKG / "runtime" / "widget.json").read_text(encoding="utf-8"))
-surface = runtime["surface"]
-values = {k: v.get("init", 0) for k, v in runtime["vars"].items()}
-atlas = Image.open(PKG / "assets" / "glyphs.png").convert("RGBA")
-spec = surface["fonts"][0]
-CW, CH = spec["cell"]
-COLS = atlas.width // CW
-CJK = ImageFont.truetype(CJK_PATH, 16)
+NAMES = ("page1-task.png", "page2-environment.png", "page3-ams.png")
 
 
-def rgb565(v):
-    return (((v >> 11) & 0x1F) * 255 // 31,
-            ((v >> 5) & 0x3F) * 255 // 63,
-            (v & 0x1F) * 255 // 31)
+def rgb565(value):
+    return (((value >> 11) & 0x1F) * 255 // 31,
+            ((value >> 5) & 0x3F) * 255 // 63,
+            (value & 0x1F) * 255 // 31)
 
 
-def atlas_text(img, x, y, s, px, color, align, box_w):
-    adv_scale = px / 32.0
-    bitmap_scale = px / float(CH)
-    widths = [spec["metrics"][spec["chars"].index(c)][0] * adv_scale
-              for c in s if c in spec["chars"]]
+def atlas_text(img, x, y, text, px, color, align, box_width, atlas, spec):
+    cell_width, cell_height = spec["cell"]
+    columns = atlas.width // cell_width
+    advance_scale = px / 32.0
+    bitmap_scale = px / float(cell_height)
+    widths = [spec["metrics"][spec["chars"].index(char)][0] * advance_scale
+              for char in text if char in spec["chars"]]
     total = sum(widths)
-    cx = x if align == "left" else (x + box_w - total if align == "right"
-                                    else x + (box_w - total) / 2)
+    cursor = x if align == "left" else (x + box_width - total if align == "right"
+                                       else x + (box_width - total) / 2)
     layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    for ch in s:
-        if ch not in spec["chars"]:
-            cx += px * 0.3
+    for char in text:
+        if char not in spec["chars"]:
+            cursor += px * 0.3
             continue
-        idx = spec["chars"].index(ch)
-        adv = spec["metrics"][idx][0]
-        cell = atlas.crop(((idx % COLS) * CW, (idx // COLS) * CH,
-                           (idx % COLS) * CW + CW, (idx // COLS) * CH + CH))
-        resized = cell.resize((max(1, round(CW * bitmap_scale)),
-                               max(1, round(CH * bitmap_scale))), Image.LANCZOS)
-        layer.alpha_composite(resized, (round(cx), round(y)))
-        cx += adv * adv_scale
+        index = spec["chars"].index(char)
+        advance = spec["metrics"][index][0]
+        left, top = (index % columns) * cell_width, (index // columns) * cell_height
+        cell = atlas.crop((left, top, left + cell_width, top + cell_height))
+        resized = cell.resize((max(1, round(cell_width * bitmap_scale)),
+                               max(1, round(cell_height * bitmap_scale))), Image.Resampling.LANCZOS)
+        layer.alpha_composite(resized, (round(cursor), round(y)))
+        cursor += advance * advance_scale
     tint = Image.new("RGBA", layer.size, color + (255,))
     tint.putalpha(layer.getchannel("A"))
     img.alpha_composite(tint)
 
 
-def render(page_index, out_name):
+def render_page(runtime, atlas, font, page_index):
+    surface = runtime["surface"]
+    values = {key: value.get("init", 0) for key, value in runtime["vars"].items()}
+    spec = surface["fonts"][0]
     img = Image.new("RGBA", (640, 480), rgb565(surface["background"]) + (255,))
-    d = ImageDraw.Draw(img)
-    for n in surface["elements"]:
-        if n.get("page", 4) not in (4, page_index):
+    draw = ImageDraw.Draw(img)
+    for node in surface["elements"]:
+        if node.get("page", 4) not in (4, page_index):
             continue
-        color = rgb565(n["color"])
-        x, y, w, h = n["x"], n["y"], n["w"], n["h"]
-        if n["type"] == "panel":
-            d.rounded_rectangle((x, y, x + w - 1, y + h - 1),
-                                radius=n.get("radius", 0), fill=color)
-        elif n["type"] == "meter":
-            # fill only; the track is a separate panel behind it
-            pct = max(0, min(100, int(values.get(n["var_bind"], 0))))
-            fw = int(w * pct / 100)
-            if fw:
-                d.rounded_rectangle((x, y, x + fw - 1, y + h - 1),
-                                    radius=n.get("radius", 0), fill=color)
-        elif n["type"] == "text":
-            label = str(values.get(n["var_bind"], "")) if "var_bind" in n else n.get("text", "")
-            size, align = n.get("font_size", 16), n.get("align", "left")
-            if size > 16 and all(c in spec["chars"] or c == " " for c in label):
-                atlas_text(img, x, y, label, size, color, align, w)
+        color = rgb565(node["color"])
+        x, y, width, height = (node[key] for key in ("x", "y", "w", "h"))
+        if node["type"] == "panel":
+            draw.rounded_rectangle((x, y, x + width - 1, y + height - 1),
+                                   radius=node.get("radius", 0), fill=color)
+        elif node["type"] == "meter":
+            percent = max(0, min(100, int(values.get(node["var_bind"], 0))))
+            filled = int(width * percent / 100)
+            if filled:
+                draw.rounded_rectangle((x, y, x + filled - 1, y + height - 1),
+                                       radius=node.get("radius", 0), fill=color)
+        elif node["type"] == "text":
+            label = str(values.get(node["var_bind"], "")) if "var_bind" in node else node.get("text", "")
+            size, align = node.get("font_size", 16), node.get("align", "left")
+            if size > 16 and all(char in spec["chars"] or char == " " for char in label):
+                atlas_text(img, x, y, label, size, color, align, width, atlas, spec)
             else:
                 if align == "right":
-                    pos, anchor = (x + w, y), "ra"
+                    position, anchor = (x + width, y), "ra"
                 elif align == "center":
-                    pos, anchor = (x + w / 2, y), "ma"
+                    position, anchor = (x + width / 2, y), "ma"
                 else:
-                    pos, anchor = (x, y), "la"
-                d.text(pos, label, font=CJK, fill=color, anchor=anchor)
-    img.convert("RGB").save(OUT / out_name)
+                    position, anchor = (x, y), "la"
+                draw.text(position, label, font=font, fill=color, anchor=anchor)
+    return img.convert("RGB")
 
 
-OUT.mkdir(parents=True, exist_ok=True)
-names = ["page1-task.png", "page2-environment.png", "page3-ams.png"]
-for i, name in enumerate(names):
-    render(i, name)
-print("rendered %d pages -> %s" % (len(names), OUT.relative_to(ROOT)))
+def render_all(package_dir, output_dir, font_path=None):
+    package_dir, output_dir = Path(package_dir), Path(output_dir)
+    runtime = json.loads((package_dir / "runtime/widget.json").read_text(encoding="utf-8"))
+    resolved = resolve_font(font_path)
+    font = ImageFont.truetype(str(resolved), 16)
+    with Image.open(package_dir / "assets/glyphs.png") as source:
+        atlas = source.convert("RGBA")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for index, name in enumerate(NAMES):
+        target = output_dir / name
+        render_page(runtime, atlas, font, index).save(target)
+        paths.append(target)
+    print(f"Offline preview: {len(paths)} pages -> {output_dir} | CJK font: {resolved}")
+    return paths
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--package-dir", type=Path, default=ROOT / ".build/package")
+    parser.add_argument("--output-dir", type=Path, default=ROOT / ".build/preview")
+    parser.add_argument("--font", type=Path, help="CJK font, or set BAMBU_CJK_FONT")
+    args = parser.parse_args(argv)
+    render_all(args.package_dir, args.output_dir, args.font)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:bambu-monitor:printer-snapshot:v1",
+  "title": "Bambu Monitor internal printer snapshot v1 (provider contract, not firmware protocol)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source", "printer", "connection", "generated_at", "job", "metrics", "ams"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "source": {"enum": ["bambu-cloud", "bambu-lan", "home-assistant"]},
+    "printer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "model"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "model": {"type": ["string", "null"], "maxLength": 128}
+      }
+    },
+    "connection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "last_message_at"],
+      "properties": {
+        "state": {"enum": ["unconfigured", "auth_required", "connecting", "online", "offline", "error"]},
+        "last_message_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "generated_at": {"type": "string", "format": "date-time"},
+    "job": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "name"],
+      "properties": {
+        "state": {"type": ["string", "null"], "maxLength": 64},
+        "name": {"type": ["string", "null"], "maxLength": 256}
+      }
+    },
+    "metrics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["remaining_minutes", "progress_percent", "current_layer", "total_layers", "nozzle_celsius", "bed_celsius", "chamber_celsius", "part_fan_percent", "aux_fan_percent"],
+      "properties": {
+        "remaining_minutes": {"$ref": "#/$defs/nonnegative_integer_metric"},
+        "progress_percent": {"$ref": "#/$defs/percent_metric"},
+        "current_layer": {"$ref": "#/$defs/nonnegative_integer_metric"},
+        "total_layers": {"$ref": "#/$defs/nonnegative_integer_metric"},
+        "nozzle_celsius": {"$ref": "#/$defs/metric"},
+        "bed_celsius": {"$ref": "#/$defs/metric"},
+        "chamber_celsius": {"$ref": "#/$defs/metric"},
+        "part_fan_percent": {"$ref": "#/$defs/percent_metric"},
+        "aux_fan_percent": {"$ref": "#/$defs/percent_metric"}
+      }
+    },
+    "ams": {
+      "type": "array", "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "trays"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 32},
+          "trays": {
+            "type": "array", "maxItems": 4,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["id", "remaining_percent"],
+              "properties": {
+                "id": {"type": "string", "minLength": 1, "maxLength": 32},
+                "remaining_percent": {"$ref": "#/$defs/percent_metric"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "metric": {
+      "type": "object", "additionalProperties": false,
+      "required": ["value", "quality", "updated_at"],
+      "properties": {
+        "value": {"type": ["number", "null"]},
+        "quality": {"enum": ["valid", "stale", "unknown", "unsupported"]},
+        "updated_at": {"type": ["string", "null"], "format": "date-time"}
+      },
+      "allOf": [{
+        "if": {"properties": {"quality": {"enum": ["valid", "stale"]}}},
+        "then": {"properties": {"value": {"type": "number"}, "updated_at": {"type": "string", "format": "date-time"}}},
+        "else": {"properties": {"value": {"type": "null"}, "updated_at": {"type": "null"}}}
+      }]
+    },
+    "nonnegative_integer_metric": {
+      "allOf": [
+        {"$ref": "#/$defs/metric"},
+        {"properties": {"value": {"type": ["integer", "null"], "minimum": 0}}}
+      ]
+    },
+    "percent_metric": {
+      "allOf": [
+        {"$ref": "#/$defs/nonnegative_integer_metric"},
+        {"properties": {"value": {"maximum": 100}}}
+      ]
+    }
+  }
+}

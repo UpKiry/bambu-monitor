@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "source": "bambu-cloud",
+  "printer": {"id": "EXAMPLE-PRINTER-NOT-A-REAL-SN", "model": "A1 mini"},
+  "connection": {"state": "online", "last_message_at": "2026-11-18T06:00:00+08:00"},
+  "generated_at": "2026-11-18T06:00:01+08:00",
+  "job": {"state": "RUNNING", "name": "synthetic-example.gcode"},
+  "metrics": {
+    "remaining_minutes": {"value": 95, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "progress_percent": {"value": 42, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "current_layer": {"value": 126, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "total_layers": {"value": 300, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "nozzle_celsius": {"value": 219.5, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "bed_celsius": {"value": 60, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "chamber_celsius": {"value": null, "quality": "unsupported", "updated_at": null},
+    "part_fan_percent": {"value": 80, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"},
+    "aux_fan_percent": {"value": null, "quality": "unsupported", "updated_at": null}
+  },
+  "ams": [{
+    "id": "0",
+    "trays": [
+      {"id": "0", "remaining_percent": {"value": null, "quality": "unknown", "updated_at": null}},
+      {"id": "1", "remaining_percent": {"value": null, "quality": "unknown", "updated_at": null}},
+      {"id": "2", "remaining_percent": {"value": null, "quality": "unknown", "updated_at": null}},
+      {"id": "3", "remaining_percent": {"value": null, "quality": "unknown", "updated_at": null}}
+    ]
+  }]
+}

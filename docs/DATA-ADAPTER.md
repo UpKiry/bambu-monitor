@@ -1,42 +1,89 @@
-# bambu-monitor 数据接入说明
+# 数据契约与字段映射
 
-组件包本身只声明结构，不含任何联网代码、URL 或凭据。数据接入时把下列字段写进
-runtime/widget.json 的 vars（或由宿主下发快照），画面自动更新，布局与状态机无需改动。
+本项目当前只展示占位读数，没有云或本地提供器。本次新增的是来源无关的内部模型约定，不是已经实现的数据接口。来源选型见 [云端方案](CLOUD-OPTIONS.md)，职责边界见 [架构文档](ARCHITECTURE.md)。
 
-## 变量映射（组件变量 ← 打印机字段）
+## 两种结构不能混淆
 
-| 组件变量 | 类型 | 语义 | ha-bambulab 同源字段 |
+[组件运行清单](../package/runtime/widget.json)的 `vars` 声明 `type/init`，属于包内静态定义。`var_bind` 让 UI 引用运行时变量；改 `init` 只改变初始化显示，不能实现持续采集。
+
+[内部快照 Schema](../schemas/printer-snapshot.schema.json)用于计划中的 PC 提供器输出，保留数值、质量、时间和 AMS 层级。它不是直接发送到 ESP32 的协议；宿主投影能力仍待核验。完整合成示例见 [云快照样例](../examples/snapshot.cloud.example.json)，不得把该样例当成实时数据。
+
+## 内部快照 v1
+
+| 字段 | 含义 |
+|---|---|
+| `schema_version` | 当前固定为 1；破坏性修改需显式升级 |
+| `source` | `bambu-cloud` / `bambu-lan` / `home-assistant` |
+| `printer.id` / `printer.model` | 目标设备 ID 和已识别机型；型号未知时为 null |
+| `connection.state` | `unconfigured` / `auth_required` / `connecting` / `online` / `offline` / `error` |
+| `connection.last_message_at` | 最近收到目标打印机有效遥测的时间，未收到为 null；不是 broker ping 时间 |
+| `generated_at` | 当前快照生成时间，不代表每项读数都刚更新 |
+| `job.state` / `job.name` | 原始任务状态和名称；未知为 null，后续 UI 自行本地化 |
+| `metrics` | 九项基础指标，每项包含 value、quality、updated_at |
+| `ams[]` | 已知 AMS 单元；其 trays 按 ID 标识，当前契约每单元最多四槽 |
+
+一个指标的例子：
+
+```json
+{"value": 219.5, "quality": "valid", "updated_at": "2026-11-18T06:00:00+08:00"}
+```
+
+质量语义是契约的一部分：
+
+| quality | value / updated_at | 意义 |
+|---|---|---|
+| `valid` | 数值 / 带时区时间 | 已获得且仍有效；0 是正常数值 |
+| `stale` | 保留最后数值 / 保留原时间 | 曾经有效，目前已过期 |
+| `unknown` | null / null | 未获得可靠值、上游值无效或能力未确认 |
+| `unsupported` | null / null | 已根据机型/设备能力确认没有该指标 |
+
+所有时间使用 RFC 3339 带时区。状态和时间的业务一致性由未来提供器保证：不能把未来时间当作新鲜、同一帧中 AMS/槽 ID 必须唯一、字段时间不能晚于生成时间。JSON Schema 校验结构和字段约束，不替代这些跨字段逻辑、协议解析或 freshness 算法。
+
+Schema 当前只支持四槽 AMS 单元，多 AMS 通过多个单元表示。不同形态的新硬件需要先验证并扩展契约，不能静默截断或按数组位置错配。
+
+## 原始遥测 → 内部模型 → 当前 UI
+
+以下为常见旧版 `print` 结构。完整消息根节点先取 `print`；新固件兼容见 [云协议研究](CLOUD-PROTOCOL.md)。
+
+| 原始 print 字段 | 内部 metrics 字段 | 当前 UI 变量 | 转换 |
 |---|---|---|---|
-| remain | string | 剩余时间 "HH:MM" | mc_remaining_time（分钟，'0' 表示未知）→ 自行格式化 |
-| prog | int 0-100 | 打印进度 | mc_percent |
-| layer | int | 当前层 | layer_num |
-| layers | int | 总层数 | total_layer_num |
-| nozzle | int | 喷嘴温度 °C | nozzle_temper |
-| bed | int | 热床温度 °C | bed_temper |
-| chamber | int | 腔体温度 °C | chamber_temper |
-| fan_part | int % | 部件冷却风扇 | cooling_fan_speed（'0'-'15' 档位，需换算百分比） |
-| fan_aux | int % | 辅助风扇 | big_fan1_speed / big_fan2_speed |
-| tray1 - tray4 | int % | AMS 各槽余量 | ams.tray[].remain |
+| `mc_remaining_time` | `remaining_minutes` | `remain` | 非负整数分钟 → HH:MM；0 需结合任务状态判断，不能一律认定未知 |
+| `mc_percent` | `progress_percent` | `prog` | 整数 0–100 |
+| `layer_num` | `current_layer` | `layer` | 非负整数 |
+| `total_layer_num` | `total_layers` | `layers` | 非负整数；0 可代表尚未获知 |
+| `nozzle_temper` | `nozzle_celsius` | `nozzle` | 模型保留小数，最后显示时取整 |
+| `bed_temper` | `bed_celsius` | `bed` | 同上 |
+| `chamber_temper` | `chamber_celsius` | `chamber` | 先确认机型支持 |
+| `cooling_fan_speed` | `part_fan_percent` | `fan_part` | 确认是 0–15 原始档后换算 |
+| `big_fan1_speed` | `aux_fan_percent` | `fan_aux` | 常见结构为辅助风扇；按机型确认 |
+| `ams.ams[].tray[].remain` | `ams[].trays[].remaining_percent` | `tray1`～`tray4` | 用户选定 AMS，再按槽 ID 映射 |
 
-## 本版为何没有状态机
+旧文档中的 `big_fan1_speed / big_fan2_speed` 不能互换：`big_fan2_speed` 通常是腔体风扇，不是辅助风扇。旧文档简写的 `ams.tray[]` 也遗漏了 AMS 单元数组。
 
-首版只展示读数，没有 gcode_state 驱动的「打印中 / 已暂停 / 完成 / 失败」：
-契约禁止在没有数据源时伪造实时值，状态机依赖真实事件，接数据后再加更稳。
-接入时建议新增 int 变量 gcode_state，用 logic: "p4-logic-v1" 的 when 条件驱动
-标题与状态芯片，而不是把状态写死成文本。
+风扇第一版可采用 `round(raw * 100 / 15)`。ha-bambulab 采用向上取整到 10% 桶，目的是减少原始档位抖动；两者有显示差异，方案实施时应选择并在测试中固定，不把原始档位直接当成百分比。源代码参考 [fan_percentage](https://github.com/greghesp/ha-bambulab/blob/main/custom_components/bambu_lab/pybambu/utils.py)。超范围或无法解析值应标 unknown，不静默夹到 0 或 100 后冒充有效值。
 
-## 两条可选通道
+当前 UI 只有单个喷嘴和四个槽。双喷嘴需要明确选择目标喷嘴；多 AMS 需要明确选择目标单元，不能默认取数组第一项。喷嘴/AMS 选择与 UI 扩展在接入后续阶段确定。
 
-1. PC 提供器（推荐）：客户端新增 bambu.printer 数据源，走 USB widget/data。
-   IP 与 access code 留在 PC 私有存储，不进包、不下发设备。
-2. 设备直连：固件有 wifi.feed + response_map + http，但固件无 MQTT/TLS 客户端，
-   因此需要先在本机把 MQTT 数据转成公开 HTTPS JSON 再让设备拉取；固件拒绝私网地址。
+## 增量和过期规则
 
-## 重新打包
+未来实现应满足：
 
-    petui pack pkg <输出>.hachiapp
-    petui validate <输出>.hachiapp
-    petui publish <输出>.hachiapp
+1. 第一次连接没有遥测时，所有指标 unknown；仅知道机型不支持的项目可设 unsupported。
+2. 收到增量只更新出现且有效的字段及其时间；未出现字段保留旧值和旧时间。
+3. AMS 按单元 ID 与槽 ID 合并。空槽/明确移除应清除缓存；缺席于本次增量不代表移除。完整快照与增量的删除语义需按机型验证。
+4. 原始 `remain=-1`、空字符串、缺失或机型不支持都不能被处理成真实 0%。耗材余量是设备估计，不一定存在或可靠。
+5. 字段超过有效期后标 stale；从未有有效读数继续 unknown。设计默认 60 秒阈值，见 [配置设计样例](../examples/provider.example.toml)，待实测调整，不能据此宣称云固定一秒上报。
+6. broker 已连接而打印机离线时仍应 offline；连接重试不更新旧读数时间。
+7. 凭据失效进入 auth_required，不循环发送验证码。设备切换、账号切换和区域切换必须清空对应缓存，避免串机。
 
-保持 component.json.id = "bambu-monitor" 不变，新内容哈希会成为同一组件的新版本；
-设备需在组件中心打开同一卡片点「保存并同步」才会覆盖。
+## 设备显示的待办
+
+当前 13 个变量都是 string/int，不能直接接收 null，也未实现 stale、unsupported 或真实状态标题。接入前需要单独设计“未知/不支持/过期”的可见状态，避免用初始化 0 误导。
+
+机型标题和“等待数据”现在是静态文本。新增 gcode_state、连接状态和质量变量需同时核对变量配额、宿主投影与固件能力，不应只把状态硬写为“打印中”。
+
+## 凭据隔离与测试范围
+
+内部快照不包含账号、uid、access token、LAN code、相机 URL 或全量原始消息。严格 Schema 会拒绝额外字段，但防止把秘密写入允许的字符串字段仍需提供器代码脱敏和审查。
+
+[契约测试](../tests/test_snapshot_contract.py)覆盖零值/缺测/不支持/过期、时间格式、范围、来源和额外凭据字段。这些测试不验证登录、增量合并实现、云订阅、USB 或设备能力；那些功能目前尚未实现。

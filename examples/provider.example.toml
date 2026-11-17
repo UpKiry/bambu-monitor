@@ -1,0 +1,25 @@
+# 设计示例：当前工程不读取此配置，没有可运行的提供器。
+# 实现方案选定后再增加配置加载器；不要填入密码、token、验证码或 LAN code。
+
+[provider]
+kind = "bambu-cloud"  # 本阶段优先；未来可实现 bambu-lan / home-assistant
+region = "cn"         # cn 或 global；按 Bambu 账号区域，不按电脑位置
+printer_id = ""       # 登录并列出 devices 后由用户选择，不能默认选第一台
+
+[credentials]
+reference = "bambu-monitor/cloud/default"  # 系统密钥库条目的逻辑名称
+
+[freshness]
+# 设计初值，尚未用真实设备验收，不代表云端固定推送频率。
+stale_after_seconds = 60
+
+[reconnect]
+initial_delay_seconds = 1
+max_delay_seconds = 60
+jitter = true
+# 凭据被拒绝时进入 auth_required，不无限重试登录或自动重复发验证码。
+
+[output]
+# 后续若实现独立服务，只绑定loopback；Pet Manager对接另做能力验证。
+bind = "127.0.0.1"
+# 尚未分配 HTTP 路由或实现服务，不把它当作当前可访问的 API。

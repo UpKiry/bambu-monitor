@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
-"""Copy the first-screen render into package/pc/cover.png (the card image).
-
-The cover must come from an actual rendered frame, not a hand-drawn mock.
-"""
+"""Create a build cover from an offline rendered first frame, without publishing."""
+import argparse
 from pathlib import Path
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "design" / "page1-task.png"
-DST = ROOT / "package" / "pc" / "cover.png"
 
-img = Image.open(SRC)
-if img.size != (640, 480):
-    raise SystemExit("cover must be 640x480, got %s" % (img.size,))
-DST.parent.mkdir(parents=True, exist_ok=True)
-img.convert("RGB").save(DST, "PNG", optimize=True)
-print("cover %dx%d -> %s (%d bytes)"
-      % (img.width, img.height, DST.relative_to(ROOT), DST.stat().st_size))
+
+def make_cover(source, destination):
+    destination = Path(destination)
+    with Image.open(source) as image:
+        if image.size != (640, 480):
+            raise ValueError(f"Cover must be 640x480, got {image.size}")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        image.convert("RGB").save(destination, "PNG", optimize=True)
+    print(f"Cover -> {destination} ({destination.stat().st_size} bytes)")
+    return destination
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, default=ROOT / ".build/preview/page1-task.png")
+    parser.add_argument("--output", type=Path, default=ROOT / ".build/cover.png")
+    args = parser.parse_args(argv)
+    make_cover(args.source, args.output)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
