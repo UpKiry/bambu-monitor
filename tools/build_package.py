@@ -235,6 +235,10 @@ def dump(path, obj):
 for sub in ("runtime", "assets", "pc"):
     (PKG / sub).mkdir(parents=True, exist_ok=True)
 
+# The packer expects assets/ to exist even when only PNGs are declared, and an
+# empty directory cannot be tracked by git, so keep the marker file reproducible.
+(PKG / "assets" / ".keep").touch()
+
 dump(PKG / "component.json", component)
 dump(PKG / "negative-screen.json", negative)
 dump(PKG / "buttons.json", buttons)
