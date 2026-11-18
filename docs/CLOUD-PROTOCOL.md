@@ -2,7 +2,7 @@
 
 核查日期：2026-11-18（Asia/Shanghai）。依据是公开社区源码和文档，没有登录用户账号、调用账户接口、连接真实 MQTT 或修改打印任务。**本文不代表真实云链路、USB 或实机验收通过。**
 
-用户已选择A自研云适配器，提供器尚未实现，实施入口见 [计划](IMPLEMENTATION-PLAN.md)，历史取舍见 [方案比较](CLOUD-OPTIONS.md)。本阶段排除打印机本地MQTT，使用云MQTT。以下是社区复现的私有协议，不是官方稳定开放API。
+用户已选择A自研云适配器，现有M1离线核心见 [操作](OFFLINE-CORE.md)、[候选profile](PROTOCOL-PROFILES.md)和[验证](M1-VERIFICATION.md)，实际网络适配与真实云验证仍待M2/M3；后续见 [计划](IMPLEMENTATION-PLAN.md)。本阶段排除打印机本地MQTT，使用云MQTT。以下是社区复现的私有协议，不是官方稳定开放API。
 
 ## 证据版本与许可证
 
@@ -27,7 +27,7 @@
 
 中国区 MQTT 也使用 `.com` 域名。区域按账号所属服务区选择，不按电脑位置猜测。ha-bambulab 对 China 单独映射，其他地区统一使用全球 API 和 US broker。
 
-证据：[常量](https://github.com/greghesp/ha-bambulab/blob/e3c73139d443e9183ed2f804be30d2f2e53bbe66/custom_components/bambu_lab/pybambu/const.py)、[区域转换](https://github.com/greghesp/ha-bambulab/blob/e3c73139d443e9183ed2f804be30d2f2e53bbe66/custom_components/bambu_lab/pybambu/utils.py)、[云实现](https://github.com/greghesp/ha-bambulab/blob/e3c73139d443e9183ed2f804be30d2f2e53bbe66/custom_components/bambu_lab/pybambu/bambu_cloud.py)。[配置样例](../examples/provider.example.toml)的 `cn/global` 是本项目设计名，不是登录 API 字段，当前也没有加载器。
+证据：[常量](https://github.com/greghesp/ha-bambulab/blob/e3c73139d443e9183ed2f804be30d2f2e53bbe66/custom_components/bambu_lab/pybambu/const.py)、[区域转换](https://github.com/greghesp/ha-bambulab/blob/e3c73139d443e9183ed2f804be30d2f2e53bbe66/custom_components/bambu_lab/pybambu/utils.py)、[云实现](https://github.com/greghesp/ha-bambulab/blob/e3c73139d443e9183ed2f804be30d2f2e53bbe66/custom_components/bambu_lab/pybambu/bambu_cloud.py)。[配置样例](../examples/provider.example.toml)的 `cn/global` 是本项目配置名，不是登录 API 字段；M1已有严格非秘密加载器。
 
 ## 2. 登录、验证码与 MFA
 
@@ -135,7 +135,7 @@ HTTP 鉴权：`Authorization: Bearer <accessToken>`。
 
 ## 8. 项目边界与待验证项
 
-[内部 Schema](../schemas/printer-snapshot.schema.json)和[配置样例](../examples/provider.example.toml)都是未来提供器约定，没有可运行的配置加载、HTTP/SSE/WebSocket 路由或登录命令。现有 `widget/data` 列表协议不自动支持自定义 surface 变量；USB、宿主能力与实机渲染单独验收。
+[内部 Schema](../schemas/printer-snapshot.schema.json)已有离线核心输出，[配置样例](../examples/provider.example.toml)可由check-config加载，replay经fake会话调用共用解析/状态机；具体见 [离线操作](OFFLINE-CORE.md)。当前已有真实HTTP/MQTT适配、私有登录和前台采集代码，使用与离线证据见[云采集使用](CLOUD-COLLECTOR.md)、[M2/M3记录](M2-M3-VERIFICATION.md)及[公开参考](CLOUD-REFERENCES.md)。仍没有真实账号验证或HTTP/SSE/WebSocket宿主服务。现有 `widget/data` 列表协议不自动支持自定义 surface 变量；USB、宿主能力与实机渲染单独验收。
 
 | 项目 | 已有证据 | 仍须验证 |
 |---|---|---|

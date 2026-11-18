@@ -9,7 +9,7 @@
 
 A Bambu Lab printer dashboard prototype for ESP32-P4 / PetUI, with offline build tools and a provider-independent telemetry contract.
 
-> **当前是显示原型，尚未连接真实打印机数据。** 页面中的 `00:00` 和 `0` 是初始化占位值。云认证、实时采集和设备变量下发仍在规划中。
+> **当前设备界面仍是显示原型，尚未连接真实打印机数据。** 页面中的 `00:00` 和 `0` 是初始化占位值。已实现 PC 离线核心、真实 HTTP/云 MQTT 适配和私有终端采集入口；真实账号/固件验证、宿主投影与设备显示待验收。
 
 ## 界面预览
 
@@ -26,8 +26,11 @@ A Bambu Lab printer dashboard prototype for ESP32-P4 / PetUI, with offline build
 | 三页布局、13 个显示变量、六个按键翻页 | 已实现声明结构，实机画面待验收 |
 | 隔离构建、预览、明确文件清单打包 | 已实现 |
 | 数据契约、合成样例、离线检查和 CI 配置 | 已实现；CI 运行结果见上方徽章 |
-| Bambu Cloud 认证、设备发现、云 MQTT 采集 | 已选择方案 A（自研），需求和计划已整理，实现待开始 |
-| 自定义界面的实时变量下发 | 待核对 Pet Manager 与固件能力 |
+| PC 离线解析、身份/质量缓存、fake HTTP/MQTT与CLI回放 | 已实现，见[操作说明](docs/OFFLINE-CORE.md)及[实施证据](docs/M1-VERIFICATION.md) |
+| Bambu Cloud HTTP、云 MQTT 及前台采集入口 | 代码与离线传输测试已实现；[使用说明](docs/CLOUD-COLLECTOR.md)，真实账号/云/固件仍pending |
+| 私有手机号／邮箱登录、系统凭据库与本地退出登录 | 已实现；国区手机号密码／短信验证码支持见[验证记录](docs/PHONE-LOGIN-VERIFICATION.md)，真实账号与密钥库仍待验证 |
+| 本地引导窗口、设置保存与监控首页 | 已实现；[使用说明](docs/SETUP-WIZARD.md)，真实 Tk 合成交互通过；真实云与密钥库待联调 |
+| 自定义界面的实时变量下发 | [M0审计](docs/M0-HOST-AUDIT.md)已完成可取得证据核实；生产宿主源码与设备能力待取得 |
 | 打印机本地 MQTT | 后续计划 |
 
 组件 ID 为 `bambu-monitor`，版本 `0.1.6`，运行时为 `p4-bounded-runtime-v4`。现有 [组件包](dist/bambu-monitor-0.1.6.hachiapp)是显示原型，不包含云端数据提供器。
@@ -41,7 +44,7 @@ Bambu Cloud HTTP + 云 MQTT → 自研采集器 → 统一快照 → Pet Manager
 打印机 LAN MQTT（后续）───────────────────┘
 ```
 
-这是待实现的数据流。先完成 M0 宿主/13变量能力核实，并行推进 M1 离线采集核心，再分别验收认证、云订阅、宿主传输和实机显示。Python 是计划中的参考采集器运行时，不在组件包或 ESP32 内执行。
+这是目标数据流。共用核心已有离线验证，并已实现真实网络入口、私有终端认证和前台调度，等待用户本机真实云联调；M0生产通路和真实握手仍pending，不能宣称已上屏。Python不在组件包或ESP32内执行。
 
 从 [需求规格](docs/REQUIREMENTS.md)、[实施计划](docs/IMPLEMENTATION-PLAN.md)与 [验收矩阵](docs/ACCEPTANCE.md)阅读；准备在新对话实施时使用 [交接文档](docs/HANDOFF.md)。B（pybambu）和 C（HA）的 [历史比较](docs/CLOUD-OPTIONS.md)保留供追溯，不再作为待选项。
 
@@ -63,7 +66,13 @@ python -m pip install -e '.[dev]'
 
 python tools/project.py check
 python tools/project.py build
+python -m bambu_monitor check-config examples/provider.example.toml
+python -m bambu_monitor replay examples/replay.synthetic.ndjson
 ```
+
+回放每行输出带 `input_class=synthetic` 的快照与PC诊断，不联网、不发送到屏幕。完整输入格式、profile与生命周期边界见 [离线核心](docs/OFFLINE-CORE.md)。
+
+云采集现在提供本地引导窗口：安装 cloud 依赖后，用带 Tk 的 Python 执行 `python -m bambu_monitor setup`。依次选择区域、登录、选择打印机并保存，日常首页可手动启停；本机可双击 [start-monitor.command](start-monitor.command)。安装与流程见[本地向导](docs/SETUP-WIZARD.md)。需要 NDJSON 时仍可在终端运行 `python -m bambu_monitor collect your-provider.toml --duration 60`。本轮未使用真实账号；支持分支和限制见[云采集使用](docs/CLOUD-COLLECTOR.md)，离线传输证据见[M2/M3验证](docs/M2-M3-VERIFICATION.md)。
 
 Windows PowerShell 使用 `.venv\Scripts\Activate.ps1` 激活；也可直接调用虚拟环境里的 Python。
 
@@ -111,8 +120,9 @@ bambu-monitor/
 ├── package/       # 组件资源与生成 JSON 基线
 ├── tools/         # 统一入口、布局生成、预览和检查
 ├── schemas/       # 来源无关的内部数据契约
-├── examples/      # 合成快照与配置设计示例
-├── tests/         # 离线契约测试
+├── src/bambu_monitor/ # PC离线核心、传输边界与CLI
+├── examples/      # 合成快照、非秘密配置和有标签回放
+├── tests/         # 契约、遥测状态与fake集成测试
 ├── docs/          # 架构、协议、方案、开发与验证记录
 ├── design/        # 三页离线参考图
 ├── dist/          # 已有组件包
@@ -135,7 +145,14 @@ bambu-monitor/
 | [数据契约](docs/DATA-ADAPTER.md) | 字段映射、增量、缺测与过期规则 |
 | [开发指南](docs/DEVELOPMENT.md) | 环境、检查、构建、预览、打包 |
 | [路线图](docs/ROADMAP.md) | 后续实施顺序及验收条件 |
-| [验证记录](docs/VERIFICATION.md) | 已执行的检查和未验证的真实链路 |
+| [M2/M3云采集使用](docs/CLOUD-COLLECTOR.md) | 安装、私有登录、前台采集、凭据与实际限制 |
+| [M2/M3验证](docs/M2-M3-VERIFICATION.md) | 真实适配器离线测试、审查修复与待真实验证项 |
+| [公开项目参考](docs/CLOUD-REFERENCES.md) | 固定版本、交叉证据、取舍和许可 |
+| [M0宿主审计](docs/M0-HOST-AUDIT.md) | 本机真实版本、8项限制、13项/状态预算、生产源码与能力缺口 |
+| [M1离线操作](docs/OFFLINE-CORE.md) | 可运行CLI、模块与生命周期、输入和安全边界 |
+| [M1验证记录](docs/M1-VERIFICATION.md) | 本轮代码/测试与待验证层次 |
+| [协议profile](docs/PROTOCOL-PROFILES.md) | 候选字段、身份、基线与纯离线测试标记 |
+| [验证记录](docs/VERIFICATION.md) | 既有工程检查与本轮证据入口 |
 
 ## 测试与贡献
 
@@ -147,7 +164,7 @@ python tools/project.py check
 
 欢迎通过 Issue 或 Pull Request 参与。报告兼容问题时请附 Python / 操作系统版本，以及相关机型、固件和脱敏错误；提交代码前运行检查，说明改动目的与验证方式。界面改动请附预览，保持生成逻辑与组件基线一致。
 
-不要在 Issue、PR、日志或组件中提交密码、验证码、云 token、LAN Access Code 或原始账户响应。[配置示例](examples/provider.example.toml)只用于设计讨论，当前没有配置加载器。
+不要在 Issue、PR、日志或组件中提交密码、验证码、云 token、LAN Access Code 或原始账户响应。[配置示例](examples/provider.example.toml)由离线加载器读取，严格拒绝秘密或未声明字段；当前有私有TTY登录CLI，尚未真实账号验收；不要把秘密放进命令参数。
 
 ## 开源协议
 

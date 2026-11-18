@@ -4,6 +4,7 @@ __pycache__/
 *.swp
 .venv/
 .venv-dev/
+.venv-gui/
 .build/
 *.egg-info/
 .env

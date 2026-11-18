@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bambu-monitor"
 version = "0.1.6"
-description = "Offline build tools for the Bambu monitor PetUI component"
+description = "Bambu monitor PetUI build tools and offline cloud telemetry core"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
@@ -20,6 +20,10 @@ Issues = "https://github.com/UpKiry/bambu-monitor/issues"
 
 [project.optional-dependencies]
 dev = ["jsonschema>=4.23,<5", "rfc3339-validator>=0.1.4,<0.2"]
+cloud = ["paho-mqtt==2.1.0", "keyring>=25.7,<26"]
 
-[tool.setuptools]
-packages = []
+[project.scripts]
+bambu-monitor = "bambu_monitor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -12,7 +12,7 @@ python -m pip install -e '.[dev]'
 
 Windows PowerShell 激活：`.venv\Scripts\Activate.ps1`。也可始终直接使用虚拟环境里的 Python，不依赖激活。打包需要本机 Pet Manager 维护的 PetUI CLI，检查/构建/预览不需要启动 Pet Manager。
 
-`pyproject.toml` 管理依赖范围，目前是开发工具工程，没有可运行的云采集 CLI；`pip install` 不会启动服务或登录账号。没有锁定所有传递依赖，CI安装的是范围内版本。发布采集服务前再确定锁定和升级策略。
+`pyproject.toml` 管理依赖范围；已包含可运行的 `bambu-monitor` 离线CLI与 `src/` 核心，命令见 [离线操作](OFFLINE-CORE.md)。`pip install` 不会启动服务或登录账号。新增可选cloud依赖与 `login/collect/logout` 入口见 [云采集使用](CLOUD-COLLECTOR.md)；真实账号、云兼容与密钥库实测仍pending。离线核心和HTTP用标准库；云MQTT固定Paho2.1.0，原生凭据库用keyring，既有预览依赖Pillow。没有锁定所有传递依赖，CI安装的是范围内版本。真实采集部署前再确定网络/密钥库依赖、分发和锁定策略。
 
 ## 统一入口和输出
 
@@ -41,7 +41,7 @@ make preview PYTHON=.venv/bin/python ARGS='--font /path/to/cjk-font.ttc'
 - 十三个变量的初始化类型和surface绑定，页面引用有效。
 - 三个页面×六个物理输入共十八条翻页路径，包括循环边界。
 - 字模/封面的PNG格式和尺寸。
-- JSON Schema语法及[内部数据契约测试](../tests/test_snapshot_contract.py)。
+- JSON Schema语法及内部契约、遥测质量/作用域、fake传输/认证、CLI回放与生命周期回归。具体用例与边界见 [本轮记录](M1-VERIFICATION.md)。
 
 默认翻页检查解释本项目的声明规则，不是固件解释器。可额外配置PetUI技能目录，对比其 `bounded_app` 实现：
 

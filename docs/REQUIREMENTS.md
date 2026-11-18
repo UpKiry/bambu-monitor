@@ -2,13 +2,13 @@
 
 ## 状态、目标与范围
 
-**已选择方案 A：自研 Bambu Cloud 只读适配器。本文是待实施需求，不代表功能已经实现。** 当前会话只整理文档，后续实现由新会话按 [实施计划](IMPLEMENTATION-PLAN.md)推进，验收以 [验收规格](ACCEPTANCE.md)为准。
+**已选择方案 A：自研 Bambu Cloud 只读适配器。本文保持目标需求，不能整体当成功能已实现。** 本仓库已开始 M0/M1，实际范围见 [M0审计](M0-HOST-AUDIT.md)和[M1记录](M1-VERIFICATION.md)；后续按 [实施计划](IMPLEMENTATION-PLAN.md)推进，验收以 [验收规格](ACCEPTANCE.md)为准。
 
 目标是在一台电脑上完成“交互认证 → 明确选择一台绑定打印机 → 云 MQTT 遥测 → 规范化快照 → Pet Manager 宿主 → 现有三页界面”，准确表达连接、缺测和数据质量。Python 是参考采集器的默认工程方向；原生 Rust、独立服务或桌面附属进程的最终宿主集成形式，由 M0 的实际接口证据决定。
 
 MVP 限定：一个账号、一个明确选择的区域、一台当前选定打印机；设备发现可以返回多台。设计支持 `cn` 和 `global` 两种区域映射，首轮真实验证只要求一个实际账号区域及一个目标机型/固件组合；未实测的区域、登录分支和平台必须列为待验证。界面保持单喷嘴、一个选定 AMS 的四槽投影，不承诺所有机型具备全部 13 项读数。多账号并发、LAN MQTT、HA、pybambu 封装、相机、FTP、打印文件、任务控制、公开数据中转及 NAS 分发不在本次 MVP 范围。
 
-本项目的 [快照 Schema](../schemas/printer-snapshot.schema.json)是内部数据结构，不是 USB 协议。[配置样例](../examples/provider.example.toml)尚无加载器。接口研究中的域名与认证分支见 [云协议记录](CLOUD-PROTOCOL.md)，它们不是稳定官方开放 API。
+本项目的 [快照 Schema](../schemas/printer-snapshot.schema.json)是内部数据结构，不是 USB 协议。[配置样例](../examples/provider.example.toml)已有非秘密离线加载器，真实网络与本地私有认证入口仍待M2。接口研究中的域名与认证分支见 [云协议记录](CLOUD-PROTOCOL.md)，它们不是稳定官方开放 API。
 
 ## 阶段和门禁
 

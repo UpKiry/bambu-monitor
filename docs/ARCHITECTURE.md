@@ -2,11 +2,11 @@
 
 ## 当前工程做什么
 
-当前工程负责一个PetUI显示组件和离线构建，数据提供器尚未实现。**已选择A自研Bambu Cloud适配器**；B/pybambu和C/HA为历史备选，本地MQTT后续再做。执行入口见 [需求](REQUIREMENTS.md)、[计划](IMPLEMENTATION-PLAN.md)与 [验收](ACCEPTANCE.md)，已有工程验证见 [历史记录](VERIFICATION.md)。
+当前工程负责PetUI显示组件、离线构建及PC采集器。真实HTTP/云MQTT适配、私有TTY/凭据库与前台调度代码已有离线测试，实际云验证及宿主投影尚未完成，见[当前使用](CLOUD-COLLECTOR.md)和[本轮证据](M2-M3-VERIFICATION.md)。**已选择A自研Bambu Cloud适配器**；M0审计/M1实现见 [审计](M0-HOST-AUDIT.md)、[离线模块](OFFLINE-CORE.md)与[本轮验证](M1-VERIFICATION.md)。B/pybambu和C/HA为历史备选，本地MQTT后续再做。执行入口见 [需求](REQUIREMENTS.md)、[计划](IMPLEMENTATION-PLAN.md)与 [验收](ACCEPTANCE.md)，旧工程验证见 [历史记录](VERIFICATION.md)。
 
 ```mermaid
 flowchart LR
-    Cloud["Bambu Cloud HTTP + 云 MQTT"] --> CP["自研云提供器 A · 待实现"]
+    Cloud["Bambu Cloud HTTP + 云 MQTT"] --> CP["自研云提供器 A · 代码已有/真实待验证"]
     LAN["打印机 LAN MQTT · 后续"] --> LP["本地提供器 · 待实现"]
     CP --> Model["统一快照 · 契约已定义"]
     LP --> Model
@@ -71,8 +71,8 @@ M0按 [实施计划](IMPLEMENTATION-PLAN.md)执行：
 - [组件资源](../package/runtime/widget.json)：已提交基线；[生成脚本](../tools/build_package.py)维护布局与变量。
 - [工程入口](../tools/project.py)：检查、受控构建、预览、打包；普通构建写入 `.build/`。
 - [Schema](../schemas/printer-snapshot.schema.json)和[样例](../examples/snapshot.cloud.example.json)：只在 PC 开发/测试使用，不打入组件。
-- [配置设计样例](../examples/provider.example.toml)：尚无加载器，所有参数都是设计阶段输入。
-- 方案A已确定，下一会话按 [实施计划](IMPLEMENTATION-PLAN.md)建立真正可运行、可测试的`src/`采集器与CLI，不先堆放不可用桩。
+- [配置样例](../examples/provider.example.toml)：已有严格非秘密加载器及check-config，真实凭据入口仍待实现。
+- M1实际模块和可运行命令见 [离线操作](OFFLINE-CORE.md)，状态缓存与传输边界已有fake/回放验证；图中真实云和宿主箭头仍为目标。
 
 本轮文档准备不改组件ID、版本和视觉布局，不自动清理用户副本，不覆盖原有发布包。本次工程检查与正式PetUI解释器、设备验收的关系见 [开发指南](DEVELOPMENT.md)。
 

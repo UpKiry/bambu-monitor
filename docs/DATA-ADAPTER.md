@@ -1,6 +1,6 @@
 # 数据契约与字段映射
 
-本项目已选择A自研Bambu Cloud适配器，但当前只有占位读数，没有云或本地提供器。内部模型是待实现接口的契约；实施见 [需求](REQUIREMENTS.md)、[计划](IMPLEMENTATION-PLAN.md)，历史取舍见 [云端比较](CLOUD-OPTIONS.md)，职责见 [架构](ARCHITECTURE.md)。
+本项目已选择A自研Bambu Cloud适配器。设备界面仍只有占位读数，PC侧已实现共用离线解析/质量/回放；真实云和本地提供器未接通。实际候选字段、时间/身份规则和纯离线标记见 [协议profile](PROTOCOL-PROFILES.md)与 [实施证据](M1-VERIFICATION.md)；目标需求/后续见 [需求](REQUIREMENTS.md)、[计划](IMPLEMENTATION-PLAN.md)，职责见 [架构](ARCHITECTURE.md)。
 
 ## 两种结构不能混淆
 
@@ -86,4 +86,4 @@ Schema 当前只支持四槽 AMS 单元，多 AMS 通过多个单元表示。不
 
 内部快照不包含账号、uid、access token、LAN code、相机 URL 或全量原始消息。严格 Schema 会拒绝额外字段，但防止把秘密写入允许的字符串字段仍需提供器代码脱敏和审查。
 
-[契约测试](../tests/test_snapshot_contract.py)覆盖零值/缺测/不支持/过期、时间格式、范围、来源和额外凭据字段。这些测试不验证登录、增量合并实现、云订阅、USB 或设备能力；那些功能目前尚未实现。
+[契约测试](../tests/test_snapshot_contract.py)覆盖Schema；新增[遥测测试](../tests/test_telemetry.py)与[fake集成](../tests/test_provider.py)覆盖共用解析、增量、代次、身份、liveness和回放，实际范围见[M1记录](M1-VERIFICATION.md)。这些离线证据不验证真实云登录/订阅、宿主投影、USB或设备能力。

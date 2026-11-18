@@ -4,7 +4,7 @@
 
 2026-11-18，用户明确选择 **A：自研 Bambu Cloud 适配器**，要求先整理需求和计划，再在新的对话中实施。不要重新要求用户在A/B/C之间选择。B（封装pybambu）和C（HA桥接）仅保留为历史比较；本地MQTT是未来独立阶段。
 
-当前交接只包含文档，**采集器、认证、云MQTT和13变量实时上屏均未实现**。文档中的模块、CLI和IPC设计不能当成现有功能。
+当前已推进到M2/M3代码候选：真实HTTP/云MQTT适配、私有TTY邮箱认证、系统凭据库优先和前台恢复调度已实现并离线测试；真实云账号、原生密钥库读写、宿主及设备仍pending。优先读[云采集使用](CLOUD-COLLECTOR.md)、[M2/M3验证](M2-M3-VERIFICATION.md)和[公开参考](CLOUD-REFERENCES.md)。M0/M1历史见 [M0证据](M0-HOST-AUDIT.md)、[M1操作](OFFLINE-CORE.md)、[M1记录](M1-VERIFICATION.md)及[候选profile](PROTOCOL-PROFILES.md)。以下启动消息和旧基线清单是历史，不覆盖最新状态。
 
 ## 新会话第一条消息
 
