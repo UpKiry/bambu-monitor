@@ -72,6 +72,10 @@ class TrayFact:
     remaining: int | None = None
     empty: bool = False
     removed: bool = False
+    material_present: bool = False
+    material: str | None = None
+    color_present: bool = False
+    color: str | None = None
 
 
 @dataclass
@@ -224,6 +228,22 @@ def decode(payload: bytes, profile: str, offline_test_markers: bool = False) -> 
                         fact.remaining = number(tray["remain"], "integer", 0, 100)
                         if fact.remaining is None:
                             report.errors.append("invalid_tray_remaining")
+                    fact.material_present = "tray_type" in tray
+                    if fact.material_present:
+                        value = tray["tray_type"]
+                        if (isinstance(value, str) and 1 <= len(value) <= 64
+                                and value == value.strip() and value.isprintable()):
+                            fact.material = value
+                        else:
+                            report.errors.append("invalid_tray_material")
+                    fact.color_present = "tray_color" in tray
+                    if fact.color_present:
+                        value = tray["tray_color"]
+                        if isinstance(value, str) and re.fullmatch(r"[0-9A-Fa-f]{8}", value):
+                            fact.color = value.upper()
+                        else:
+                            report.errors.append("invalid_tray_color")
                     report.trays.append(fact)
-                    report.evidence |= fact.empty or fact.removed or fact.remaining is not None
+                    report.evidence |= (fact.empty or fact.removed or fact.remaining is not None
+                                        or fact.material is not None or fact.color is not None)
     return report

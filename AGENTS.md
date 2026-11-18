@@ -1,15 +1,16 @@
 # 工程协作约定
 
-本项目是 `bambu-monitor` PetUI 显示组件、构建工程和 PC 离线采集核心。**2026-11-18 用户已选择方案 A：自研 Bambu Cloud HTTP + 云 MQTT 适配器，并已授权本仓库实施。** 已有 M0 只读审计、M1核心及M2/M3真实HTTP/MQTT、私有TTY/凭据库和前台运行代码；另有已确认流程的[本地登录设置窗口](docs/SETUP-WIZARD.md)，[182项本机检查与Tk交互证据](docs/SETUP-WIZARD-VERIFICATION.md)。真实账号/云协议、系统密钥库实际读写、宿主投影和实机仍待验证。先读[交接](docs/HANDOFF.md)、[需求](docs/REQUIREMENTS.md)、[实施计划](docs/IMPLEMENTATION-PLAN.md)与[验收矩阵](docs/ACCEPTANCE.md)，再读[M0证据](docs/M0-HOST-AUDIT.md)、[云采集使用](docs/CLOUD-COLLECTOR.md)、[M2/M3验证](docs/M2-M3-VERIFICATION.md)与[公开参考对照](docs/CLOUD-REFERENCES.md)。M1历史见[离线操作](docs/OFFLINE-CORE.md)和[M1记录](docs/M1-VERIFICATION.md)。
+本项目包括自研 Bambu Cloud HTTP + 云 MQTT 只读采集器，以及 PetUI 三页显示组件。macOS 主入口为后台托盘和 localhost 浏览器配置；旧 CLI/Tk 保留。采集代码、本机界面和合成测试已实现，真实云账号、系统钥匙串、launchd 登录恢复、宿主投影与实机仍待验收。
 
-- `package/` 是组件资源；布局和变量声明由 `tools/build_package.py` 生成。保持组件 ID `bambu-monitor`，未经明确要求不更改版本或 UI。
-- 使用 `python tools/project.py check`、`build`、`preview`、`pack` 作为统一入口，具体依赖和参数见 `docs/DEVELOPMENT.md`。
-- 默认生成内容进入 `.build/`；打包只使用明确清单中的资源。不要删除用户已有的重复文件，不要把它们打入包。
-- `schemas/` 定义提供器的内部快照契约，`examples/` 仅供离线说明和检查，不作为实时数据上屏。
-- 方案 A 已确定；B/pybambu 与 C/HA 只作历史比较，本地 MQTT 后续再做。仓库内代码与测试已获实施授权；外部修改/UI/真实账号按下述边界推进。不要把文档、契约、合成样例或离线测试称为云登录、云 MQTT、USB 或实机链路已通过。
-- 先做 M0 宿主/13变量核实，可并行推进 M1 离线核心。composition/bridge 的8项限制与 PC fetch 的每来源8项限制须区别；不能据此假定目标设备能力或通过拆来源解决私网鉴权。
-- 外部 Pet Manager/固件改动先列明源码与范围，不直接修改安装应用、技能或系统profile；UI调整先提供预览。字段有效性按会话/任务/槽身份与观测依据判断，不能把所有稳定字段一律按60秒未变判过期。
-- 云账户凭据、LAN Access Code、访问令牌、验证码和原始账户响应不得进入源码、组件包、日志或提交。仅在用户决定接入方案后实现私有凭据存储。
-- 云和 LAN 提供器应输出同一规范化结构；缺失、过期、不支持的数据与数值 0 必须区别处理。增量合并按字段和 AMS/槽 ID 进行。
-- 先核对目标宿主与固件能力，再实现变量投影；`widget/data` 列表协议不自动等于自定义 surface 变量更新协议。
-- 检查不自动发布、不自动同步、不触碰真实打印任务；发布和实机验收状态分别报告。
+先读 [README](README.md) 与 [架构边界](docs/ARCHITECTURE.md)，按任务查看 [使用](docs/LOCAL-SERVICE.md)、[开发](docs/DEVELOPMENT.md)、[数据契约](docs/DATA-ADAPTER.md)、[云协议](docs/CLOUD-PROTOCOL.md) 和 [验证状态](docs/VERIFICATION.md)。不再维护分阶段交接、重复计划或单次修复报告。
+
+- 云端方案已确定为自研适配器，不引入完整 HA/pybambu；LAN MQTT 留待后续。不提供打印任务控制或通用 MQTT publish。
+- `package/` 是组件资源，布局和变量由 `tools/build_package.py` 生成。保持组件 ID `bambu-monitor`；未经明确要求不改版本、13 项指标或 UI，UI 调整先提供预览。
+- 统一使用 `python tools/project.py check/build/preview/pack`。默认生成内容进入 `.build/`，打包只用明确清单。不要删除用户原有重复文件，也不要将其纳入包。
+- 凭据、LAN Access Code、云令牌、验证码和原始账户响应不得进入源码、普通配置、组件、日志或提交。只用本机私有交互入口与系统密钥库；不可用时明确退到本次内存，不落明文。
+- 采集和设置复用单 owner；停止/切账号/换设备撤销旧会话，迟到消息不得更新新实例。浏览器、托盘和网络回调不并发修改控制器。
+- `schemas/` 是内部快照契约，`examples/` 是离线说明。有效 0 与缺失/过期/不支持必须区别，增量按字段及 AMS/槽 ID 合并，质量结合 generation、任务/耗材身份与观测证据；不能把所有字段统一按 60 秒未变判过期。
+- PetUI 0.1.232 的 composition 总变量/bridge 绑定≤8，与 PC fetch 每来源≤8 不同；fetch 还不支持私网鉴权、localhost 和实时轮询，不能靠拆来源证明13变量可上屏。`widget/data` 列表协议不等于自定义 surface 变量通道。
+- 实现投影前核对生产宿主、固件和真实能力。外部 Pet Manager/固件修改先列路径和范围，不直接修改安装应用、技能或系统 profile，不抢占原始 USB 串口。
+- 离线测试、原生托盘、本机网页、真实云、launchd、USB 和实机验收分开报告；缺账号/设备时继续可执行工作，不能把合成数据称为实时交付。
+- 检查不自动发布、导入或同步，不操作真实打印任务；提交与推送按用户指令执行。

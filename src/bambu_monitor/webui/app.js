@@ -74,19 +74,117 @@ function renderWizard(s) {
   }
 }
 
+const metricSpecs = [
+  ['remaining_minutes','预计剩余时间','分钟'], ['progress_percent','打印进度','%'],
+  ['current_layer','当前层数','层'], ['total_layers','总层数','层'],
+  ['nozzle_celsius','喷嘴温度','°C'], ['bed_celsius','热床温度','°C'],
+  ['chamber_celsius','腔体温度','°C'], ['part_fan_percent','零件冷却风扇','%'],
+  ['aux_fan_percent','辅助风扇','%']
+];
+const qualityNames = {valid:'有效',stale:'旧值',unknown:'未知 / 未收到',unsupported:'不支持'};
+function node(tag, text, className) {
+  const el = document.createElement(tag);
+  if (text !== undefined) el.textContent = text;
+  if (className) el.className = className;
+  return el;
+}
+function qualityName(m) {return qualityNames[m?.quality] || '未知 / 未收到';}
+function observationTime(value) {
+  if (!value) return '尚无观测时间';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : `${date.toLocaleString()} · ${value}`;
+}
+function jsonText(value) {return JSON.stringify(value, null, 2) ?? 'null';}
+function metricValue(m, unit) {
+  if (m?.quality === 'unsupported') return '不支持';
+  return m?.value == null ? '等待数据' : `${m.value}${unit ? ' ' + unit : ''}`;
+}
+function renderMetrics(s) {
+  const root = $('metrics');
+  root.replaceChildren();
+  let valid = 0, stale = 0, unsupported = 0;
+  for (const [key,label,unit] of metricSpecs) {
+    const m = s.metrics?.[key];
+    if (m?.quality === 'valid') valid++;
+    if (m?.quality === 'stale') stale++;
+    if (m?.quality === 'unsupported') unsupported++;
+    const card = node('div', undefined, 'metric-card');
+    card.append(node('div', label, 'metric-label'), node('strong', metricValue(m, unit)),
+      node('span', qualityName(m), `quality quality-${Object.hasOwn(qualityNames, m?.quality) ? m.quality : 'unknown'}`),
+      node('div', observationTime(m?.updated_at), 'observed-time'));
+    root.append(card);
+  }
+  $('metric-summary').textContent = `${valid} 项有效 · ${stale} 项旧值 · ${unsupported} 项不支持 · ${9 - valid - stale - unsupported} 项未知`;
+}
+function renderMaterials(s) {
+  const root = $('ams-materials');
+  root.replaceChildren();
+  const units = Array.isArray(s.ams_materials) ? s.ams_materials : [];
+  if (!units.length) {
+    root.append(node('p', '尚未收到 AMS 单元信息；不能据此判断未安装 AMS。', 'muted'));
+    return;
+  }
+  for (const unit of units) {
+    const section = node('section', undefined, 'ams-unit');
+    section.append(node('h3', `AMS 单元 ${unit.id}`));
+    const slots = node('div', undefined, 'ams-slots');
+    for (let id = 0; id < 4; id++) {
+      const tray = (Array.isArray(unit.trays) ? unit.trays : []).find(t => String(t.id) === String(id));
+      const material = tray?.material, color = tray?.color;
+      const card = node('div', undefined, 'tray-card');
+      const type = typeof material?.value === 'string' && material.value.trim() ? material.value : '未知';
+      card.append(node('h4', `槽位 ${id + 1} · ID ${id}`), node('strong', type),
+        node('div', `类型：${qualityName(material)}`, 'muted'),
+        node('div', observationTime(material?.updated_at), 'observed-time'));
+      const colorRow = node('div', undefined, 'color-row');
+      const rawHex = typeof color?.value === 'string' ? color.value : '';
+      const safeHex = /^[0-9a-f]{8}$/i.test(rawHex) ? rawHex : null;
+      const swatch = node('span', undefined, 'color-swatch');
+      swatch.setAttribute('aria-hidden', 'true');
+      if (safeHex) swatch.style.backgroundColor = `#${safeHex}`;
+      colorRow.append(swatch, node('code', rawHex || '未知'));
+      card.append(colorRow, node('div', `颜色：${qualityName(color)}${rawHex && !safeHex ? '（色值格式无效）' : ''}`, 'muted'),
+        node('div', observationTime(color?.updated_at), 'observed-time'));
+      slots.append(card);
+    }
+    section.append(slots);
+    root.append(section);
+  }
+}
+function renderDetails(s) {
+  const telemetry = s.telemetry || {}, latest = telemetry.latest;
+  const fields = Array.isArray(telemetry.fields) ? telemetry.fields : [];
+  const generation = s.diagnostics?.generation ?? latest?.generation;
+  $('field-count').textContent = `（${fields.length} 项）`;
+  $('generation-info').textContent = `当前 generation：${generation ?? '未知'}；每行 generation 表示该字段最近观测所属会话。`;
+  $('fields-warning').textContent = telemetry.truncated ? '缓存已截断，以下不是全部已上报字段。' : '';
+  const body = $('telemetry-fields');
+  body.replaceChildren();
+  for (const field of fields) {
+    const row = node('tr');
+    row.append(node('td', field.path), node('td', jsonText(field.value), 'field-value'),
+      node('td', observationTime(field.updated_at)), node('td', String(field.generation ?? '未知')));
+    body.append(row);
+  }
+  if (!fields.length) {
+    const cell = node('td', '尚无已观测字段。');
+    cell.colSpan = 4;
+    const row = node('tr'); row.append(cell); body.append(row);
+  }
+  $('raw-info').textContent = latest ? `接收时间：${observationTime(latest.received_at)}；generation：${latest.generation ?? '未知'}` : '';
+  $('raw-telemetry').textContent = latest ? jsonText(latest.data) : '尚未收到目标 report。';
+  $('diagnostics').textContent = s.diagnostics ? jsonText(s.diagnostics) : '暂无诊断数据。';
+}
+
 function applyStatus(s) {
   state = s;
   $('phase').textContent = phaseNames[s.phase] || '等待';
   $('service-state').textContent = s.phase === 'collecting' ? '后台运行中' : phaseNames[s.phase] || '待命';
   $('telemetry').textContent = s.phase === 'collecting' ? ({online:'已收到目标遥测',offline:'目标遥测暂无有效证据',auth_required:'需要重新登录',connecting:'等待目标遥测'}[s.connection] || '等待目标遥测') : '未采集中';
   $('region-label').textContent = s.region ? (s.region === 'cn' ? '中国大陆' : '全球') : '待设置';
-  const labels = [['nozzle_celsius','喷嘴','°C'],['bed_celsius','热床','°C'],['progress_percent','进度','%']];
-  $('metrics').innerHTML = labels.map(([key,label,unit]) => {
-    const m = s.metrics[key];
-    if (!m) return '';
-    let value = m.quality === 'unsupported' ? '不支持' : m.value == null ? '等待数据' : escape(m.value) + unit + (m.quality === 'stale' ? '（旧值）' : '');
-    return `<span class="metric">${label} ${value}</span>`;
-  }).join('');
+  renderMetrics(s);
+  renderMaterials(s);
+  renderDetails(s);
   renderWizard(s);
   $('settings').hidden = !s.configured || s.setup_stage !== 'home' || choosingRegion;
   if (s.config && !configInitialized) {
@@ -107,7 +205,7 @@ function applyStatus(s) {
   if (s.phase === 'collecting' && op && op.command === 'collector/start') note('采集在后台运行，关闭此网页可继续采集。');
   const busy = submitting || s.phase !== 'idle';
   document.querySelectorAll('button,input,select').forEach(el => {
-    el.disabled = busy;
+    el.disabled = el.hasAttribute('data-read-only') ? false : busy;
   });
   $('start').disabled = busy || s.setup_stage !== 'home' || choosingRegion;
   $('stop').disabled = !['starting','collecting'].includes(s.phase);
@@ -117,7 +215,7 @@ async function refresh() {
   try { applyStatus(await api('status')); }
   catch (e) {
     $('service-state').textContent = '无法连接本机服务';
-    document.querySelectorAll('button,input,select').forEach(el => {el.disabled = true;});
+    document.querySelectorAll('button,input,select').forEach(el => {el.disabled = !el.hasAttribute('data-read-only');});
     note(e.message);
   }
 }
@@ -140,6 +238,7 @@ document.addEventListener('click', async event => {
   const target = event.target.closest('button[data-action]');
   if (!target || target.disabled) return;
   const action = target.dataset.action;
+  if (action === 'refresh') {await refresh(); return;}
   if (action === 'change-account') {choosingRegion = true; renderKey = null; applyStatus(state); return;}
   if (action.startsWith('region-')) {
     choosingRegion = false;

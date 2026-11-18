@@ -45,6 +45,22 @@ Python 3.11+，macOS 图形登录会话：
 
 “停止监控”先请求停止，立即撤下当前遥测；连接清理完成后才能更改账号/设备、保存高级设置或退出登录。“退出本机登录”删除对应本机令牌，不全局撤销云账号。普通退出保留已保存令牌。关闭网页不会停止采集；退出托盘服务会请求清理 HTTP、MQTT 和内存凭据。
 
+### 机器读数与采集详情
+
+本机网页展示全部九项规范化任务/温度/风扇指标，各自带质量和实际观测时间。AMS lite 按单元 ID、槽位 ID 0–3 展示四槽的耗材类型和 RGBA 颜色；不再将余量作为后台关注项。类型/颜色来自 `tray_type/tray_color`，不要求 RFID UUID；未知、旧值与有效值分开显示，不根据缺失字段推断空槽或未安装。色块表示设备上报的设定颜色，不证明物理耗材在位或实际外观。
+
+“采集详情”可展开三部分：
+
+- 全部已观测字段：保存本次连接按路径合并的脱敏观测，包含尚未规范化的设备字段；原始数组作为整体保存，避免按数组位置混合不同 AMS 槽。每行保留自己的时间，不因刷新网页而变新，也不承诺仍然有效。
+- 最新脱敏原始遥测 JSON：选定设备最新一帧合法 JSON report，可查看机器实际提供的状态和版本等信息；不是 HTTP 账户响应，也不是完整历史日志。
+- 安全诊断：连接阶段、断连/超时原因、收包计数、协议及规范化字段依据，便于区分连接失败和字段质量失效。
+
+只读采集已订阅的目标 report，不增加账户/任务控制接口。敏感字段名、当前云令牌/UID/设备 ID、URL、身份 token 和常见凭据格式会被过滤；未经识别的遥测仅供本机排查，不直接成为有效指标。缓存只在内存中，停止/退出/切账号清空，重连撤销旧代展示；最多 512 个路径、字段缓存 256 KiB、单帧 64 KiB，结构/字符串另有预算，达到限制会明确提示截断。没有落盘报文功能。
+
+页面每秒自动读取本机状态，也可点“刷新本机读数”立即重读。该按钮不会发送 MQTT 命令，不能强制云端推送；现有只读 `pushall` 仍仅用于受限连接初始化，不通过反复重连模拟手动刷新。
+
+更新 Python 代码后需退出托盘服务，再重新启动，从托盘重新打开本机设置；只刷新网页无法让旧 Python 进程加载新采集代码。若此前使用本次内存登录，重启后需要重新登录。设备组件仍为既有静态版本，尚未改为类型/颜色布局或接通上屏。
+
 托盘显示未配置、需登录、处理设置、启动、采集、停止和退出等状态；采集中用颜色区分等待/无目标证据与有效目标遥测。MQTT 连接中不表示打印机在线；“暂无目标遥测证据”也不等于设备断电。读数区分有效 0、等待、不支持、旧值。后台服务与设备屏幕是否接入是两件独立状态。
 
 ## 可选登录时启动
@@ -60,6 +76,26 @@ Python 3.11+，macOS 图形登录会话：
 
 安装拒绝覆盖已有文件及符号链接；重复安装报已存在。注册失败或超时会保留文件并以 `*_installed` 错误明确说明文件已写入、运行状态需检查；不要把报错当作未安装反复重试。卸载先验证自有标记和完整参数，bootout 成功或任务已不存在后，只删除确认过的确切文件，拒绝外来 plist。此轮未执行用户真实 LaunchAgent 安装或重登录验证。
 
+## 命令行采集与旧窗口
+
+需要 NDJSON 导出时，使用 cloud 依赖即可，无需托盘或 Tk。参考[非秘密配置样例](../examples/provider.example.toml)保存自己的 `provider.toml`，明确区域、设备ID和凭据引用，然后执行：
+
+```sh
+python -m bambu_monitor check-config provider.toml
+python -m bambu_monitor collect provider.toml --duration 60
+python -m bambu_monitor collect provider.toml --login-method email-code
+# 国区手机号短信验证码使用 --login-method sms-code
+python -m bambu_monitor logout provider.toml
+```
+
+CLI 通过 POSIX 控制TTY隐藏输入账号/密码/验证码，明确询问发码与设备选择；未配置设备时即使只有一台也要选择，选择只用于本次运行，不自动改文件。stdout每行含 `input_class=live-cloud`、规范化`snapshot`与`diagnostics`；提示走TTY，诊断走stderr。该标签只表示真实网络入口，是否在线看快照连接/质量。未指定duration则持续运行，Ctrl+C/SIGTERM请求清理。退出码0为正常结束（不保证有遥测）、2为本机/配置错误、3为认证/发现无法继续，交互取消为130。
+
+`login provider.toml`可先保存令牌再`collect`。系统存储不可用时，单独login退出不会保留令牌，应在collect内完成登录；`--session-only`可主动只用本次内存。默认仅使用明确原生系统后端，不自动加载第三方文件存储。不要将账号秘密放进命令参数或环境变量。
+
+旧 Tk 窗口保留：使用带 tkinter 的 Python 安装 `.[cloud]`，运行 `python -m bambu_monitor setup`，可加 `--config`。流程与浏览器一致，但关闭Tk窗口会停止其采集。安全配置保存只支持POSIX；Linux配置默认`$XDG_CONFIG_HOME/bambu-monitor/provider.toml`，无有效绝对路径时用`~/.config/bambu-monitor/provider.toml`。Windows私有输入/安全设置入口尚未完成，不据系统凭据后端存在宣称全平台支持。
+
+以上入口共用模型与设置格式，不要同时启动多个入口采集同一设备。离线 `replay` 不联网，格式见[数据契约](DATA-ADAPTER.md)。
+
 ## 实现与安全边界
 
 - [service_runtime.py](../src/bambu_monitor/service_runtime.py)：一个永久 owner 串行执行登录、凭据库、设置和采集；只接受一个在途操作，拒绝排队堆积。HTTP/托盘只看脱离控制器的状态拷贝。快照只保留最新值；停止/关闭后拒绝旧发布。
@@ -72,10 +108,10 @@ Python 3.11+，macOS 图形登录会话：
 
 系统 DNS、HTTP 库内部调用或原生钥匙串可能阻塞；5 秒等待结束不能证明资源已回收。清理未完成返回固定错误，owner 保持真实存活直至操作结束，不强杀线程、不启动第二个 owner 假装恢复。当前尚无签名 .app 安装包、自动更新或跨平台托盘支持声明。
 
-旧 Tk `python -m bambu_monitor setup` 和 CLI `collect/login/logout/replay` 保留，详见[旧向导](SETUP-WIZARD.md)与[云采集](CLOUD-COLLECTOR.md)。不要同时用多个入口采集同一设备。
+旧 CLI 与 Tk 入口的关闭/存储语义见上文，运行层与宿主边界见[架构](ARCHITECTURE.md)。
 
 ## 参考与验证
 
 参考 [Keralots/BambuHelper](https://github.com/Keralots/BambuHelper) 的“网页登录 → 绑定设备 → 保存配置 → 监控状态”流程与 Web portal 组织方式。它主要是 ESP32 固件，macOS 托盘与后台宿主由本项目独立实现；没有复制其实现、LAN 接口、密码保存或任务控制能力。阅读依据为其公开 README 的 Cloud、Setup 与 Web Interface 章节，不宣称审查过其完整代码。托盘参考 [pystray 0.19.5 文档](https://pystray.readthedocs.io/en/latest/usage.html)，macOS 必须主线程运行。
 
-自动与实际验证记录见[服务验证](LOCAL-SERVICE-VERIFICATION.md)。浏览器测试使用明确的合成 HTTP/MQTT，不能替代真实云账号、系统钥匙串、固件字段或设备验收。
+自动与实际验证记录集中在[验证状态](VERIFICATION.md)。浏览器测试使用明确的合成 HTTP/MQTT，不能替代真实云账号、系统钥匙串、固件字段或设备验收。

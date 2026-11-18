@@ -52,7 +52,8 @@ def collect(session, uid, token, *, emit, stop_event, duration=None,
                     break
                 snapshot = session.snapshot(now=wall_clock(), monotonic=now)
                 if not stop_event.is_set():
-                    emit({"input_class": "live-cloud", "snapshot": snapshot, "diagnostics": session.diagnostics()})
+                    emit({"input_class": "live-cloud", "snapshot": snapshot, "diagnostics": session.diagnostics(),
+                          **session.inspection_view()})
                 result = 3
                 break
             if session.active:
@@ -81,7 +82,8 @@ def collect(session, uid, token, *, emit, stop_event, duration=None,
             if snapshot is not None and (last_emit is None or now - last_emit >= tick_seconds):
                 if stop_event.is_set():
                     break
-                emit({"input_class": "live-cloud", "snapshot": snapshot, "diagnostics": session.diagnostics()})
+                emit({"input_class": "live-cloud", "snapshot": snapshot, "diagnostics": session.diagnostics(),
+                          **session.inspection_view()})
                 last_emit = now
             wait(min(0.1, tick_seconds))
     finally:

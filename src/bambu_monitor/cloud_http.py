@@ -2,7 +2,7 @@
 
 Importing the module never opens a connection. This is an independently written
 transport, not a copied HA client. Public protocol references and real-network
-limitations are recorded in docs/HTTP-RESEARCH.md. No real account was used to
+limitations are recorded in docs/CLOUD-PROTOCOL.md. No real account was used to
 validate it; injectable connections exercise the same implementation offline.
 """
 from __future__ import annotations

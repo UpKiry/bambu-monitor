@@ -193,6 +193,20 @@ def resolve_petui(configured=None):
     raise FileNotFoundError("Official PetUI is required for pack; set PETUI_BIN or pass --petui")
 
 
+def display_preview(output_dir=None, *, font=None):
+    """Render the display-model pages; never touches the shipped package."""
+    try:
+        from .render_display import output_filenames, render_contact, render_scenarios
+    except ImportError:
+        from render_display import output_filenames, render_contact, render_scenarios
+    directory = prepare_output_files(output_dir or ROOT / ".build/display-preview",
+                                     output_filenames())
+    frames = render_scenarios(directory, font)
+    contact = render_contact(frames, directory / "review.png")
+    print(f"Display review sheet: {contact}; shipped package unchanged")
+    return directory
+
+
 def pack(output=None, *, build_dir=None, petui=None):
     """Use the official packer and validator; never publish or sync."""
     command = resolve_petui(petui)
@@ -229,6 +243,10 @@ def main(argv=None):
     preview.add_argument("--build-dir", type=Path, default=ROOT / ".build/package")
     preview.add_argument("--output-dir", type=Path, default=ROOT / ".build/preview")
     preview.add_argument("--font", type=Path, help="CJK font, or BAMBU_CJK_FONT")
+    display = subparsers.add_parser("display-preview",
+                                    help="render the display-model pages and degraded states")
+    display.add_argument("--output-dir", type=Path, default=ROOT / ".build/display-preview")
+    display.add_argument("--font", type=Path, help="CJK font, or BAMBU_CJK_FONT")
     packing = subparsers.add_parser("pack", help="official PetUI pack and validate only")
     packing.add_argument("--build-dir", type=Path, default=ROOT / ".build/package")
     packing.add_argument("--output", type=Path, default=ROOT / ".build/bambu-monitor-0.1.6.hachiapp")
@@ -249,6 +267,8 @@ def main(argv=None):
                 from render_frames import render_all
             directory = prepare_output_files(args.output_dir, ("page1-task.png", "page2-environment.png", "page3-ams.png"))
             render_all(build(args.build_dir), directory, args.font)
+        elif args.command == "display-preview":
+            display_preview(args.output_dir, font=args.font)
         elif args.command == "pack":
             pack(args.output, build_dir=args.build_dir, petui=args.petui)
         elif args.command == "glyphs":

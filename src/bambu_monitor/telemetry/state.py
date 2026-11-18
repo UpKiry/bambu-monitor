@@ -27,7 +27,7 @@ def _mono(value):
 
 @dataclass
 class Metric:
-    value: int | float | None = None
+    value: int | float | str | None = None
     observed: datetime | None = None
     generation: int | None = None
     serial: int = -1
@@ -37,6 +37,8 @@ class Metric:
 @dataclass
 class Tray:
     metric: Metric = field(default_factory=Metric)
+    material: Metric = field(default_factory=Metric)
+    color: Metric = field(default_factory=Metric)
     identity: dict = field(default_factory=dict)
     confirmed: bool = False
     epoch: int = 0
@@ -120,6 +122,12 @@ class TelemetryState:
             # A later broker/online notification cannot revive old evidence.
             self._last_mono = None
             self.baseline_generation = None
+            self._invalidate_materials()
+
+    def _invalidate_materials(self):
+        for slots in self._trays.values():
+            for tray in slots.values():
+                tray.material.invalid = tray.color.invalid = True
 
     @staticmethod
     def _changed(old, incoming):
@@ -172,6 +180,7 @@ class TelemetryState:
             return False
         if self._last_mono is not None and mono - self._last_mono > self.liveness_seconds:
             self.baseline_generation = None
+            self._invalidate_materials()
         self._serial += 1
         self._view_mono = mono
         self._last_frame_mono = mono
@@ -209,12 +218,14 @@ class TelemetryState:
                 if report.invalid_ams or uid in report.invalid_units or tid in report.invalid_trays.get(uid, set()):
                     tray.confirmed = False
                     tray.metric.invalid = True
+                    tray.material.invalid = tray.color.invalid = True
         for uid in report.removed_units:
             for tray in self._trays.get(uid, {}).values():
                 tray.removed = True
                 tray.removal_generation = self.generation
                 tray.confirmed = False
                 tray.metric = Metric()
+                tray.material, tray.color = Metric(), Metric()
                 tray.epoch += 1
             accepted = True
         for fact in report.trays:
@@ -225,6 +236,7 @@ class TelemetryState:
                 tray.removal_generation = self.generation
                 tray.confirmed = False
                 tray.metric = Metric()
+                tray.material, tray.color = Metric(), Metric()
                 tray.epoch += 1
                 accepted = True
                 continue
@@ -240,6 +252,7 @@ class TelemetryState:
                 if tray.identity:
                     tray.retired.append(tray.identity.copy())
                 tray.metric = Metric()
+                tray.material, tray.color = Metric(), Metric()
                 tray.identity = {}
                 tray.confirmed = False
                 tray.epoch += 1
@@ -248,12 +261,32 @@ class TelemetryState:
                 continue
             if any(value is None for value in fact.identity.values()):
                 tray.metric = Metric()
+                tray.material, tray.color = Metric(), Metric()
                 tray.identity = {}
                 tray.confirmed = False
                 tray.epoch += 1
             elif fact.identity:
                 tray.identity.update(fact.identity)
                 tray.confirmed = tray.confirmed or "tray_uuid" in fact.identity
+            # Explicit type/color observations need no RFID UUID (AMS lite).
+            # A changed descriptor starts a new pair: do not present the other
+            # cached descriptor as belonging to the newly observed material.
+            topology_valid = not (report.invalid_ams or fact.unit in report.invalid_units
+                                  or fact.tray in report.invalid_trays.get(fact.unit, set()))
+            if topology_valid:
+                changed = any(present and value is not None and metric.value is not None
+                              and metric.value != value
+                              for present, value, metric in (
+                                  (fact.material_present, fact.material, tray.material),
+                                  (fact.color_present, fact.color, tray.color)))
+                if changed:
+                    tray.material, tray.color = Metric(), Metric()
+                for present, value, metric in (
+                        (fact.material_present, fact.material, tray.material),
+                        (fact.color_present, fact.color, tray.color)):
+                    if present:
+                        self._observe(metric, value, wall)
+                        accepted |= value is not None
             if fact.remaining_present:
                 self._observe(tray.metric, fact.remaining, wall)
                 accepted |= fact.remaining is not None
@@ -312,6 +345,28 @@ class TelemetryState:
             "metrics": {name: self._metric_snapshot(metric, live, name not in JOB_FIELDS or self._job_confirmed, self._unsupported(name)) for name, metric in self._metrics.items()},
             "ams": [{"id": uid, "trays": [{"id": tid, "remaining_percent": self._metric_snapshot(tray.metric, live, tray.confirmed)} for tid, tray in sorted(slots.items(), key=lambda item: int(item[0])) if not tray.removed]} for uid, slots in sorted(self._trays.items(), key=lambda item: int(item[0])) if any(not tray.removed for tray in slots.values())],
         }
+
+    def materials_snapshot(self) -> list:
+        """AMS descriptors at the last snapshot/apply clock; no numeric contract changes.
+
+        Explicit observations retain their own timestamps while the target is live.
+        Reconnect, topology ambiguity and changed descriptors revoke that basis.
+        Values are reported observations, not RFID identity or inventory evidence.
+        """
+        live = self._view_mono is not None and self._live(self._view_mono)
+
+        def descriptor(metric):
+            quality = ("unknown" if metric.value is None else
+                       "valid" if live and not metric.invalid and metric.generation == self.generation
+                       else "stale")
+            return {"value": metric.value, "quality": quality,
+                    "updated_at": metric.observed.isoformat() if metric.observed else None}
+
+        return [{"id": uid, "trays": [
+            {"id": tid, "material": descriptor(tray.material), "color": descriptor(tray.color)}
+            for tid, tray in sorted(slots.items(), key=lambda item: int(item[0])) if not tray.removed]}
+            for uid, slots in sorted(self._trays.items(), key=lambda item: int(item[0]))
+            if any(not tray.removed for tray in slots.values())]
 
     def metadata(self) -> dict:
         mono = self._view_mono if self._view_mono is not None else self._last_mono

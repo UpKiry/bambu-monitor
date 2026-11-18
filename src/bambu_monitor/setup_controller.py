@@ -403,7 +403,7 @@ class SetupController:
         self.reason = "ready" if self._committed and self._committed.selected else ("configured" if self._config else "unconfigured")
         return True
 
-    def run(self, stop_event, emit):
+    def run(self, stop_event, emit, *, inspect_telemetry=False):
         if not self._available():
             return 2
         if self._draft is not None or self._pending_selected is not None:
@@ -453,7 +453,7 @@ class SetupController:
             if stop_event.is_set():
                 self.reason = "stopped"
                 return 0
-            session = Session(ctx.config, factory(selected.id))
+            session = Session(ctx.config, factory(selected.id), inspect_telemetry=inspect_telemetry)
             session.core.model = selected.model
             result = collect(session, *private, stop_event=stop_event, emit=emit)
             if result == 3:

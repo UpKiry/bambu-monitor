@@ -31,7 +31,7 @@
 - [ha-bambulab](https://github.com/greghesp/ha-bambulab)：MIT；如后续复用代码，须保留其版权与许可证。
 - [OpenBambuAPI](https://github.com/Doridian/OpenBambuAPI)：GFDL 1.3；本项目对协议事实作归纳并链接出处，没有将上游文档整体复制进仓库。
 
-具体参考版本和证据见 [云协议核实记录](docs/CLOUD-PROTOCOL.md)、[本轮HTTP研究](docs/HTTP-RESEARCH.md)、[MQTT研究](docs/MQTT-RESEARCH.md)与[公开项目对照](docs/CLOUD-REFERENCES.md)。额外阅读的coelacant1项目固定README称AGPL-v3而LICENSE为GPLv3正文，未复制/引入其代码或样例，不能标为MIT。
+具体固定版本、协议事实与采用边界集中在[云协议与参考](docs/CLOUD-PROTOCOL.md)。额外阅读的coelacant1项目固定README称AGPL-v3而LICENSE为GPLv3正文，未复制/引入其代码或样例，不能标为MIT。
 
 ## 名称与商标
 

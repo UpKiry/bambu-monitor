@@ -16,9 +16,36 @@
   <section class="card" aria-labelledby="status-title">
     <div class="section-title"><h2 id="status-title">运行概览</h2><span id="phase" class="badge">连接中</span></div>
     <div class="status-grid"><div><label>电脑采集</label><strong id="service-state">正在连接本机服务…</strong></div><div><label>目标遥测</label><strong id="telemetry">等待数据</strong></div></div>
-    <div id="metrics" class="metrics"></div>
     <p id="notice" role="status" class="notice"></p>
-    <div class="actions"><button id="start" data-action="start">开始监控</button><button id="stop" data-action="stop" class="secondary">停止监控</button></div>
+    <div class="actions"><button id="start" data-action="start">开始监控</button><button id="stop" data-action="stop" class="secondary">停止监控</button><button id="refresh-readings" data-action="refresh" data-read-only class="secondary">刷新本机读数</button></div>
+    <p class="hint">每秒自动读取电脑中的采集状态。“刷新本机读数”只重读本机缓存，不能强制云端推送。</p>
+  </section>
+  <section class="card" aria-labelledby="readings-title">
+    <div class="section-title"><h2 id="readings-title">任务与机器读数</h2><span id="metric-summary" class="muted"></span></div>
+    <p class="hint">有效 0 与缺测不同。旧值只供参考；各项时间是该字段最近观测时间，不是网页刷新时间。</p>
+    <div id="metrics" class="metrics"></div>
+  </section>
+  <section class="card" aria-labelledby="ams-title">
+    <div class="section-title"><h2 id="ams-title">AMS lite 耗材</h2><span class="muted">类型与颜色</span></div>
+    <p class="hint">每个单元按槽位 ID 0–3 定位；未收到类型时显示“未知”。色块按上报 RGBA 色值展示，实际耗材外观可能有差异。</p>
+    <div id="ams-materials"></div>
+  </section>
+  <section class="card" aria-labelledby="details-title">
+    <h2 id="details-title">采集详情</h2>
+    <details id="fields-details">
+      <summary>全部已观测字段 <span id="field-count" class="muted"></span></summary>
+      <p class="hint">以下是按路径合并的历史观测缓存，不保证字段类型正确或当前仍有效。后续 report 缺少某路径不代表删除；请结合各行 generation 与当前 generation 判断，不能把历史值当成当前读数。</p>
+      <p id="generation-info" class="hint"></p>
+      <p id="fields-warning" class="notice"></p>
+      <div class="table-scroll"><table class="field-table"><thead><tr><th>路径</th><th>观测值</th><th>观测时间</th><th>generation</th></tr></thead><tbody id="telemetry-fields"></tbody></table></div>
+    </details>
+    <details id="raw-details">
+      <summary>最新脱敏原始遥测 JSON</summary>
+      <p class="hint">仅展示采集器已脱敏的最新目标 report，不是完整账户响应，也不代表所有字段当前有效。</p>
+      <p id="raw-info" class="hint"></p>
+      <pre id="raw-telemetry">尚未收到目标 report。</pre>
+    </details>
+    <details id="diagnostics-details"><summary>安全诊断</summary><pre id="diagnostics">暂无诊断数据。</pre></details>
   </section>
   <section class="card" aria-labelledby="setup-title"><div class="section-title"><h2 id="setup-title">账号与打印机</h2><span id="region-label" class="muted"></span></div><div id="wizard"></div></section>
   <section id="settings" class="card" aria-labelledby="settings-title" hidden>

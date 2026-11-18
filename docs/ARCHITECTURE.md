@@ -1,83 +1,80 @@
-# 架构与边界
+# 架构与实现边界
 
-## 当前工程做什么
+本项目采用自研 Bambu Cloud HTTP + 云 MQTT 只读适配器。当前交付为电脑采集器、macOS 后台托盘/浏览器配置、旧 CLI/Tk 入口和 PetUI 静态组件。实际完成范围见[验证状态](VERIFICATION.md)。LAN MQTT、HA、打印控制、相机和文件传输不在当前实现范围。
 
-当前工程负责PetUI显示组件、离线构建及PC采集器。真实HTTP/云MQTT适配、私有TTY/凭据库与前台调度代码已有离线测试，实际云验证及宿主投影尚未完成，见[当前使用](CLOUD-COLLECTOR.md)和[本轮证据](M2-M3-VERIFICATION.md)。**已选择A自研Bambu Cloud适配器**；M0审计/M1实现见 [审计](M0-HOST-AUDIT.md)、[离线模块](OFFLINE-CORE.md)与[本轮验证](M1-VERIFICATION.md)。B/pybambu和C/HA为历史备选，本地MQTT后续再做。执行入口见 [需求](REQUIREMENTS.md)、[计划](IMPLEMENTATION-PLAN.md)与 [验收](ACCEPTANCE.md)，旧工程验证见 [历史记录](VERIFICATION.md)。
-
-```mermaid
-flowchart LR
-    Cloud["Bambu Cloud HTTP + 云 MQTT"] --> CP["自研云提供器 A · 代码已有/真实待验证"]
-    LAN["打印机 LAN MQTT · 后续"] --> LP["本地提供器 · 待实现"]
-    CP --> Model["统一快照 · 契约已定义"]
-    LP --> Model
-    Model --> Export["可选本机 JSON / 事件出口 · 待实现"]
-    Model --> Projection["PetUI 投影和宿主适配 · 待验证"]
-    Projection --> UI["三页组件 · 已有"]
-```
-
-箭头表达计划的数据流，不代表已经连通。云方案见 [选型文档](CLOUD-OPTIONS.md)。
-
-## 四个职责层
-
-### 1. 提供器：连接和协议
-
-云提供器负责账号区域、交互认证、设备发现、云 MQTT 订阅、重连和原始消息解析；本地提供器以后负责 IP、Access Code 和局域网 MQTT。HA 方案负责选定实体和 HA REST/WebSocket 会话。
-
-提供器只暴露规范化遥测，不把密码、token 或设备列表中的 `dev_access_code` 透传出去。第一阶段只做监控，不提供暂停、加热、运动或打印控制。读取初始化命令采用明确白名单，避免把通用 publish 入口开放给组件。
-
-云连接的 HTTP 元数据和 MQTT 实时遥测用途不同。MQTT broker 已连接、打印机已在线、已接收完整状态是三个独立事实。新提供器应具备明确的认证状态机：
+## 数据流与模块
 
 ```text
-unconfigured → auth_required → connecting → online
-                                  │           │
-                                  └→ error    └→ offline → connecting
-凭据失效：任意已认证状态 → auth_required（由用户重新认证）
+浏览器 / macOS 托盘 → ServiceRuntime 单 owner → SetupController
+                                                  ├→ CloudAuth → HTTP / 凭据库
+                                                  └→ Collector → Session → 云 MQTT
+                                                                         ↓
+                                                          parser → TelemetryState
+                                                                         ↓
+                                                规范化快照 → 本机状态页 / CLI NDJSON
+                                                                         ⋮ 待实现
+                                                    Pet Manager 宿主投影 → USB → 设备
 ```
 
-`online` 必须有目标打印机的有效遥测依据，不能只凭broker CONNACK。恢复连接后，实际出现的字段才更新其观测时间；未出现字段保留旧值和旧时间，但是否仍valid要结合协议profile、代次、基线和任务/耗材作用域判断，不能一律按60秒无变化失效。详见 [FR-08](REQUIREMENTS.md)。
+| 模块 | 职责 |
+| --- | --- |
+| [config.py](../src/bambu_monitor/config.py)、[settings.py](../src/bambu_monitor/settings.py) | 非秘密配置、区域和设备身份、私有权限、路径校验、原子保存及冲突检测 |
+| [auth.py](../src/bambu_monitor/auth.py)、[credentials.py](../src/bambu_monitor/credentials.py) | 认证状态机、令牌恢复、UID/设备发现、显式选择、系统凭据库或会话内存 |
+| [cloud_http.py](../src/bambu_monitor/cloud_http.py)、[cloud_mqtt.py](../src/bambu_monitor/cloud_mqtt.py) | 固定云端路由、TLS、有限输入、白名单只读初始化；协议见[云协议](CLOUD-PROTOCOL.md) |
+| [session.py](../src/bambu_monitor/session.py)、[collector.py](../src/bambu_monitor/collector.py) | 有界回调队列、连接/订阅、generation、退避重连、握手/目标遥测期限与资源清理 |
+| [telemetry/](../src/bambu_monitor/telemetry/state.py)、[replay.py](../src/bambu_monitor/replay.py) | 解析、字段/AMS槽增量合并、任务/耗材身份、质量、快照与离线回放 |
+| [setup_controller.py](../src/bambu_monitor/setup_controller.py) | 新登录草稿、设备确认、凭据迁移与普通设置保存的事务边界 |
+| [service_runtime.py](../src/bambu_monitor/service_runtime.py) | 永久单 owner 串行执行设置与采集，拒绝并行操作，只保留最新快照和公开状态副本 |
+| [local_service.py](../src/bambu_monitor/local_service.py)、[webui/](../src/bambu_monitor/webui/index.html) | loopback HTTP 与浏览器配置；HTTP线程只提交操作/读取副本 |
+| [macos_service.py](../src/bambu_monitor/macos_service.py)、[service_launcher.py](../src/bambu_monitor/service_launcher.py) | 原生托盘主线程、NSTimer、signal、独立进程就绪握手和显式用户 LaunchAgent |
+| [cli.py](../src/bambu_monitor/cli.py)、[setup_gui.py](../src/bambu_monitor/setup_gui.py) | CLI与旧Tk前端，复用同一认证/设置/采集逻辑；命令见[使用指南](LOCAL-SERVICE.md) |
 
-### 2. 状态缓存和统一快照
+## 身份、质量与生命周期
 
-[内部快照 Schema](../schemas/printer-snapshot.schema.json)是本次定义的设计契约，适用于三种来源，不是已实现 HTTP API 或 USB 线协议。温度保留原始数值精度，剩余时间保留分钟，AMS 保留单元/槽 ID。
+区域和设备必须明确选择，不按电脑位置推断、不默认第一台设备、不自动回退 LAN。账号引用、区域、设备 ID 组成隔离身份；切换/重连撤销旧 generation，旧回调不能恢复新设备或新任务的数据。
 
-每个读数字段同时保存 `value`、`quality`、`updated_at`，区分真实 0、未知、不支持和过期。仅更新 `generated_at` 不能延长数据有效期。增量消息按字段合并，AMS 按单元与槽 ID 合并；列表中的空槽、明确移除和本次没有上报必须区分。
+单进程只运行一个当前设备订阅。MQTT 回调入有界队列，owner 串行合并并驱动手动 pump；Paho 不启动自动网络/重连线程。停止/关闭先置 Event，立即撤下本机当前遥测，再等待 owner 清理，未清理完成不开放新操作。HTTP/钥匙串阻塞时不声称硬5秒退出成功。
 
-快照中的 `connection` 表示当前提供器对目标打印机遥测可用性的判断。HA 桥接的 `unknown/unavailable` 应映射到质量和连接状态；HA REST 查询成功不能让不变的旧读数重新变新鲜。字段来源/时间不足时标为未知，不能编造时间。
+新登录令牌在确认前仅留内存。设置保存、凭据迁移、取消与删除失败都有明确结果；保存结果不明时停止后续操作，不删除可能已被配置引用的令牌。系统后端不可用时明确回退本次内存，不用明文文件。
 
-### 3. 显示投影
+MQTT broker 连接、目标设备有活跃证据、完整基线就绪是不同事实。`online` 必须有有效目标遥测；60秒默认阈值是目标活跃证据期限，不是所有字段 TTL。稳定字段的持续有效性取决于 profile、基线和任务/耗材身份；观测时间不能由页面刷新或心跳伪造。当前候选 profile 与完整规则见[数据契约](DATA-ADAPTER.md)。
 
-投影层将内部模型转换为当前 UI 的 13 个变量，例如分钟转 `HH:MM`、温度取整、选定 AMS 映射到四个槽。来源切换不应要求重写布局。
+当前本机服务另有内存遥测检查视图：九项规范化指标、AMS四槽材料/颜色、按路径观测缓存、最新脱敏目标 report 与安全 diagnostics。它不属于严格快照或 USB 协议，不改变有效性证据，也不保存账户响应。用户已将 AMS lite 需求从余量改为类型/颜色；既有静态组件保留，新的设备布局/投影仍待预览与接入。
 
-当前 UI 的温度、风扇和槽余量均是整数变量，没有原生空值显示；“等待数据”和机型名称也写死。后续需要质量状态和能力驱动的显示逻辑，这属于单独的 UI 迭代，先展示预览再实施。合成样例不能直接灌入正式屏幕冒充实时。
+## 设备投影尚未接通
 
-### 4. 宿主与设备传输
+[快照 Schema](../schemas/printer-snapshot.schema.json)是电脑内部契约，不是 USB 或 Pet Manager 的 IPC 协议。本机 HTTP 只用于配置和状态；不能因为存在 localhost API 就认定宿主可消费这些字段。分钟的 `HH:MM`、温度取整、AMS 按 ID 映射和逐字段不可用表示已由[展示模型](../src/bambu_monitor/display.py)实现，并用 `python tools/project.py display-preview` 渲染三页与降级状态；这属于离线前端，不改变组件包，也不等于投影已接通。
 
-旧文档把 `widget/data` 当作任意变量更新通道，这一点不能成立为已确认能力。本机 PetUI 技能的实时数据文档描述的是有界 rows 列表快照；当前组件使用自定义 surface 和 `var_bind`，不能直接套用列表行协议。
+2026-11-18 本机 PetUI **0.1.232** 文档与 Python 校验器只读审计得到以下边界；它们不代表生产 Rust、目标固件或 USB 握手已验证：
 
-本机PetUI 0.1.232参考中存在`app/snapshot`变量投影路径；对应production源码、实际设备协商和13变量接收尚未核实。离线校验器已确认composition总变量≤8、service bridge绑定≤8；PC fetch是每来源8项，拆8＋5可过声明校验，但其不支持Authorization、本机HTTP/私网且轮询≥60秒，不能直接消费本项目的私有实时采集器。
+| 通道 | 已核实限制 / 影响 |
+| --- | --- |
+| composition / service bridge | 总变量 / 标量绑定最多8，不能直接传当前13项 |
+| PC fetch | 每来源最多8，拆8+5可通过声明；网络仅公开HTTPS GET、无Authorization、拒绝localhost/私网、轮询≥60秒，不能用于本机私有实时采集 |
+| `widget/data` | 有界 rows 列表，不能据此推断任意 surface 变量可更新 |
+| `app/snapshot` | 参考中有变量通道；真实serializer、实例/序号、大小限制、设备接收与失效仍缺生产证据 |
+| 当前静态组件 | 13变量、48/48节点、8046/8191紧凑runtime字节；v2一般16变量不能证明传输也支持16 |
 
-M0按 [实施计划](IMPLEMENTATION-PLAN.md)执行：
+逐字段质量还需26位信息；即使压缩成整数，仍需可用的解码/显隐原语，不能只凭预算算术宣称支持。现有字模/进度条也没有完整未知/旧值显示方案。后续先审阅预览和预算，不静默删减13项或提高配额。
 
-1. 读取目标Pet Manager与设备实际能力，核对真实宿主源码、快照和传输预算。
-2. 用明确标记的离线合成快照检查单标量、实例身份、断连和迟到消息，不冒充实时云数据。
-3. 验证完整13项及质量状态的预算和接收，不能因v2一般16vars就认定宿主路径已支持。
-4. 若需外部产品修改，先列出具体源码和授权范围，不直接改安装应用、技能或固件，不默降UI。
-5. USB复用宿主传输管理。M0缺少设备或源码时继续M1离线核心，分别记录未验证条件。
+接入前需要与当前客户端对应的 **Pet Manager生产源码/commit、固件源码/构建标识和目标能力报告**。先追踪受控提供器、实例生命周期、序列化/传输/接收预算，再用合成单标量与13项快照测退出、迟到、乱序、断连，最后验证真实显示。USB复用宿主传输；外部修改先列具体范围并取得授权，不改安装应用/技能或直接写串口。
 
-仅有PC快照输出不等于屏幕刷新；真实云和实机链路在后续阶段分别验收。
+### 上屏仍缺的三个原语（2026-11-18 核对）
 
-## 仓库与生成边界
+展示模型已覆盖 17 个字段，但当前 PetUI 表面表达不了确认稿，不能靠删字段或合并质量绕过：
 
-- [组件资源](../package/runtime/widget.json)：已提交基线；[生成脚本](../tools/build_package.py)维护布局与变量。
-- [工程入口](../tools/project.py)：检查、受控构建、预览、打包；普通构建写入 `.build/`。
-- [Schema](../schemas/printer-snapshot.schema.json)和[样例](../examples/snapshot.cloud.example.json)：只在 PC 开发/测试使用，不打入组件。
-- [配置样例](../examples/provider.example.toml)：已有严格非秘密加载器及check-config，真实凭据入口仍待实现。
-- M1实际模块和可运行命令见 [离线操作](OFFLINE-CORE.md)，状态缓存与传输边界已有fake/回放验证；图中真实云和宿主箭头仍为目标。
+| 缺口 | 现状 | 影响 |
+| --- | --- | --- |
+| 动态颜色 | 节点只有静态 `color`；`image_bind` 仅服务桥 | AMS 色块只能画固定颜色，无法随槽位颜色变化 |
+| 质量文本 | `text`/`var_bind` 原样渲染变量，无“值 + 状态后缀”或按质量换色；dashboard 只有 `fmt_mmss`/`fmt_hms` | 无法同时显示读数与“旧值/超过上限”，也无法区分 `unknown` 与 `unsupported` |
+| 投影配额 | 宿主组合绑定最多 8 个标量；`widget/data` 是固定行列表 | 17 个业务值加质量无法完整下发，拆成多个来源也不改变单实例绑定上限 |
 
-本轮文档准备不改组件ID、版本和视觉布局，不自动清理用户副本，不覆盖原有发布包。本次工程检查与正式PetUI解释器、设备验收的关系见 [开发指南](DEVELOPMENT.md)。
+因此本轮只交付展示模型、三页离线渲染与交互路径验证；组件保持 `bambu-monitor` 0.1.6 的 13 变量静态布局。要真正上屏，需要生产宿主与固件提供更宽的受控快照通道或上述原语之一，并重新协商能力；在此之前打包新布局会重演“静态占位包冒充实时组件”的问题。
 
-## 安全和运行边界
+## 安全与工程约束
 
-密钥优先使用系统凭据库，不可用时首版默认仅会话内存；不自动回退明文文件。日志仅记录脱敏事件、错误类别和重试时间，不输出完整账户响应、认证头或原始payload。Schema拒绝额外字段不能替代实际脱敏。
-
-首版提供本地诊断/快照输出，不预设HTTP/SSE路由。M0若选独立服务入口，才定义受控IPC、访问鉴权和生命周期，默认限制同机；跨机NAS/公开HTTPS是后续部署范围。不把token放进组件或设备，不直接公开用户遥测，本阶段不接本地MQTT。
+- 本机服务只绑定 `127.0.0.1`，随机控制会话、精确 Host/Origin、无CORS、CSP/no-store；最多8请求线程、3秒读超时、64KiB body，不提供通用文件、打印控制或publish入口。
+- 云秘密只经本机交互进入内存/系统密钥库，不进argv、环境示例、普通配置、日志、快照或组件包。公开状态不输出原始账户响应/Access Code；异常只用固定安全类别。
+- 当前用户下的恶意本机进程/扩展不在隔离边界内；不将本地端口转发到网络。平台、协议、长时恢复和硬退出时限按实际证据声明。
+- [组件生成器](../tools/build_package.py)维护 ID `bambu-monitor`、版本 `0.1.6` 和三页13变量；[构建入口](../tools/project.py)只打包7个明确资源。Python、配置、测试和凭据不入设备包。
+- 代码检查、真实云、原生托盘、launchd、USB/实机验收与发布分别记录；不得为验收擅自改变打印任务。复现及未完成项见[验证状态](VERIFICATION.md)。

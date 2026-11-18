@@ -1,4 +1,4 @@
-# 可读取的非秘密配置：check-config/replay保持离线；login/collect/logout见docs/CLOUD-COLLECTOR.md。
+# 可读取的非秘密配置：check-config/replay保持离线；login/collect/logout见docs/LOCAL-SERVICE.md。
 # 真实HTTP/MQTT代码已实现，未用真实账号验收。
 # 不要填入密码、token、验证码或 LAN code。区域和设备必须由用户明确选择。
 

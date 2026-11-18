@@ -52,7 +52,14 @@ const {chromium} = require(path.resolve('.build/browser-check/node_modules/playw
     await page.waitForFunction(()=>document.getElementById('notice').textContent.includes('保存'));
     await page.locator('#start').click();
     await page.waitForFunction(()=>document.getElementById('telemetry').textContent==='已收到目标遥测');
-    await page.waitForFunction(()=>document.getElementById('metrics').textContent.includes('喷嘴 0°C'));
+    await page.waitForFunction(()=>Array.from(document.querySelectorAll('.metric-card')).some(el=>el.textContent.includes('喷嘴温度') && el.textContent.includes('0 °C') && el.textContent.includes('有效')));
+    await page.waitForFunction(()=>document.getElementById('ams-materials').textContent.includes('PLA'));
+    assert.equal(await page.locator('.tray-card').count(),4);
+    await page.locator('#raw-details summary').click();
+    await page.waitForFunction(()=>document.getElementById('raw-telemetry').textContent.includes('wifi_signal'));
+    assert.ok(!(await page.locator('#raw-telemetry').textContent()).includes('SYNTHETIC-PRIVATE-9981'));
+    await page.locator('#refresh-readings').click();
+    assert.equal(await page.locator('#raw-details').evaluate(el=>el.open),true);
     await page.screenshot({path:'.build/service-dashboard.png',fullPage:true});
     await page.close();
     const reopened = await context.newPage();
@@ -62,7 +69,9 @@ const {chromium} = require(path.resolve('.build/browser-check/node_modules/playw
     assert.equal(await reopened.locator('#live').inputValue(),'91');
     await reopened.locator('#stop').click();
     await reopened.waitForFunction(()=>document.getElementById('phase').textContent==='待命');
-    assert.equal(await reopened.locator('#metrics').textContent(),'');
+    await reopened.waitForFunction(()=>document.getElementById('metric-summary').textContent.includes('9 项未知'));
+    assert.equal(await reopened.locator('.tray-card').count(),0);
+    assert.equal(await reopened.locator('#raw-telemetry').textContent(),'尚未收到目标 report。');
     await reopened.locator('[data-action="change-account"]').click();
     await reopened.locator('[data-action="region-global"]').click();
     await reopened.locator('[data-action="cancel"]').click();

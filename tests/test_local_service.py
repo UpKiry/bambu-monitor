@@ -63,7 +63,11 @@ class SyntheticMqtt(FakeMqtt):
             self.callbacks['on_suback'](True)
         elif self.subacked:
             topic = self.subscriptions[0]
-            self.callbacks['on_message'](topic, b'{"print":{"command":"push_status","nozzle_temper":0,"bed_temper":42}}',
+            report = {'print': {'command': 'push_status', 'nozzle_temper': 0, 'bed_temper': 42,
+                                'wifi_signal': '-52dBm', 'dev_access_code': CANARY,
+                                'ams': {'ams': [{'id': 0, 'tray': [
+                                    {'id': 0, 'tray_type': 'PLA', 'tray_color': 'FF0000FF'}]}]}}}
+            self.callbacks['on_message'](topic, json.dumps(report).encode(),
                                          datetime.now(timezone.utc), time.monotonic())
 
 
@@ -152,10 +156,25 @@ class LocalServiceTests(unittest.TestCase):
         self.request('POST', '/api/collector/start')
         until(lambda: self.runtime.status()['connection'] == 'online')
         self.assertEqual(self.runtime.status()['metrics']['nozzle_celsius']['value'], 0)
+        status, body, _ = self.request('GET', '/api/status')
+        self.assertEqual(status, 200)
+        view = json.loads(body)
+        self.assertEqual(view['ams_materials'][0]['trays'][0]['material']['value'], 'PLA')
+        self.assertEqual(view['ams_materials'][0]['trays'][0]['color']['value'], 'FF0000FF')
+        self.assertEqual(view['telemetry']['latest']['data']['print']['wifi_signal'], '-52dBm')
+        self.assertNotIn(CANARY, body.decode())
+        self.assertGreater(view['diagnostics']['counters']['accepted'], 0)
+        self.assertEqual(view['diagnostics']['telemetry']['connection_reason'], 'target_telemetry')
+        initializations = list(self.transports[0].requests)
+        self.request('GET', '/api/status')  # Refreshing never sends MQTT requests.
+        self.assertEqual(self.transports[0].requests, initializations)
         self.assertFalse(self.action('setup/logout')['ok'])
         self.assertEqual(self.action('collector/stop')['reason'], 'stopping')
         self.assertIsNone(self.runtime.status()['connection'])
         self.assertEqual(self.runtime.status()['metrics'], {})
+        self.assertEqual(self.runtime.status()['ams_materials'], [])
+        self.assertEqual(self.runtime.status()['telemetry'], {})
+        self.assertEqual(self.runtime.status()['diagnostics'], {})
         until(lambda: self.runtime.status()['phase'] == 'idle')
         self.assertTrue(self.transports[0].closed)
         self.assertTrue(self.action('setup/logout')['ok'])

@@ -54,7 +54,8 @@ class ServiceRuntime:
         self._pending = None
         self._stage = "home" if self._controller.config else "region"
         self._view = {"phase": "idle", "reason": self._controller.reason, "operation": None,
-                      "connection": None, "metrics": {}, "devices": [], "setup_stage": self._stage}
+                      "connection": None, "metrics": {}, "ams_materials": [], "diagnostics": {}, "telemetry": {},
+                       "devices": [], "setup_stage": self._stage}
         self._publish_controller()
         self._thread = Thread(target=self._owner, name="bambu-service-owner", daemon=False)
         self._thread.start()
@@ -75,7 +76,7 @@ class ServiceRuntime:
             self._stop.clear()
             self._view.update(phase="starting" if command == "collector/start" else "working",
                               operation={"id": operation, "command": command, "done": False},
-                              connection=None, metrics={})
+                              connection=None, metrics={}, ams_materials=[], diagnostics={}, telemetry={})
             self._pending = (command, dict(data), operation)
             self._wake.set()
             return {"ok": True, "operation_id": operation}
@@ -85,7 +86,7 @@ class ServiceRuntime:
             operation = self._view.get("operation") or {}
             if operation.get("command") == "collector/start" and not operation.get("done"):
                 self._stop.set()
-                self._view.update(phase="stopping", connection=None, metrics={})
+                self._view.update(phase="stopping", connection=None, metrics={}, ams_materials=[], diagnostics={}, telemetry={})
                 return {"ok": True, "reason": "stopping"}
             return {"ok": True, "reason": "stopped"}
 
@@ -95,7 +96,7 @@ class ServiceRuntime:
                 return
             self._closing.set()
             self._stop.set()
-            self._view.update(phase="closing", connection=None, metrics={})
+            self._view.update(phase="closing", connection=None, metrics={}, ams_materials=[], diagnostics={}, telemetry={})
             self._wake.set()
 
     def close(self, timeout=5):
@@ -126,7 +127,10 @@ class ServiceRuntime:
             if self._stop.is_set() or self._closing.is_set():
                 return
             self._view.update(phase="collecting", connection=(snapshot.get("connection") or {}).get("state"),
-                              metrics=deepcopy(snapshot.get("metrics", {})))
+                              metrics=deepcopy(snapshot.get("metrics", {})),
+                              ams_materials=deepcopy(envelope.get("ams_materials", [])),
+                              diagnostics=deepcopy(envelope.get("diagnostics", {})),
+                              telemetry=deepcopy(envelope.get("telemetry", {})))
 
     def _execute(self, command, data):
         c = self._controller
@@ -190,7 +194,7 @@ class ServiceRuntime:
             with self._lock:
                 if not self._stop.is_set():
                     self._view["phase"] = "collecting"
-            result = c.run(self._stop, self._emit)
+            result = c.run(self._stop, self._emit, inspect_telemetry=True)
             return result == 0, c.reason
         else:
             return False, "invalid_request"
@@ -220,7 +224,7 @@ class ServiceRuntime:
                     task = data = None
                 with self._lock:
                     self._view.update(phase="closing" if self._closing.is_set() else "idle", reason=reason,
-                                      connection=None, metrics={},
+                                      connection=None, metrics={}, ams_materials=[], diagnostics={}, telemetry={},
                                       operation={"id": operation, "command": command, "done": True,
                                                  "ok": ok, "reason": reason})
                 if self._closing.is_set():
@@ -232,5 +236,5 @@ class ServiceRuntime:
                 clean = False
             with self._lock:
                 self._pending = None
-                self._view.update(phase="closed", connection=None, metrics={},
+                self._view.update(phase="closed", connection=None, metrics={}, ams_materials=[], diagnostics={}, telemetry={},
                                   reason="closed" if clean else "cleanup_failed")

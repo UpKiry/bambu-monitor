@@ -44,12 +44,15 @@ class Session:
     scheduler or worker thread here: a future runner must pump this owner.
     """
     def __init__(self, config: Config, transport: MqttTransport, *, profile="legacy-cloud-v1",
-                 queue_size=64, random_value=random.random, offline_test_markers=False):
+                 queue_size=64, random_value=random.random, offline_test_markers=False,
+                 inspect_telemetry=False):
         if not config.identity:
             raise ValueError("explicit printer selection required")
         if type(queue_size) is not int or not 1 <= queue_size <= 4096:
             raise ValueError("invalid queue budget")
         self.config, self.identity, self.transport = config, config.identity, transport
+        from .inspection import TelemetryInspection
+        self.inspection = TelemetryInspection() if inspect_telemetry else None
         self.core = TelemetryState(config.printer_id, profile=profile, liveness_seconds=config.liveness_seconds,
                                    offline_test_markers=offline_test_markers)
         self._queue, self._actions = deque(), deque()
@@ -85,6 +88,8 @@ class Session:
             self._needs_close = self._core_dirty = False
             generation, phase, reason = self.generation, self.phase, self.reason
         if dirty:
+            if self.inspection is not None:
+                self.inspection.clear()
             self.core.begin_generation(generation)
             self.core.set_connection("offline" if phase == "stopped" else phase, reason)
         if close:
@@ -100,6 +105,8 @@ class Session:
         self._assert_owner()
         if self.active:
             raise RuntimeError("session already started")
+        if self.inspection is not None:
+            self.inspection.protect(uid.value, token.value, self.config.printer_id)
         if type(monotonic) not in (int, float) or not 0 <= monotonic <= 1e12 or not math.isfinite(monotonic) or monotonic < self._last_monotonic:
             raise ValueError("invalid monotonic time")
         if not self._maintenance():
@@ -210,6 +217,13 @@ class Session:
                 message = self._queue.popleft()
                 if not self._current(message.generation):
                     continue
+                # Inspect only the current, exact target after queue/time checks.
+                # Unknown telemetry remains observable without establishing liveness.
+                if (self.inspection is not None
+                        and message.topic == f"device/{self.config.printer_id}/report"
+                        and message.monotonic >= self._last_monotonic):
+                    self.inspection.capture(message.payload, generation=message.generation,
+                                            received_at=message.observed_at)
                 # Serialize a core update against callback revocation; no transport I/O here.
                 if self.core.apply(message.payload, topic=message.topic, generation=message.generation,
                                    observed_at=message.observed_at, monotonic=message.monotonic,
@@ -268,7 +282,18 @@ class Session:
             self._actions.clear()
             self.phase, self.reason, self.retry_at = "stopped", "stopped", None
             self._needs_close = self._core_dirty = True
+        if self.inspection is not None:
+            self.inspection.clear()
+            self.inspection.protect()
         return self._maintenance()
+
+    def inspection_view(self):
+        self._assert_owner()
+        if self.inspection is None:
+            return {}
+        materials, _ = self.inspection.sanitize_value(self.core.materials_snapshot())
+        return {"telemetry": self.inspection.snapshot(self.generation),
+                "ams_materials": materials}
 
     def diagnostics(self):
         self._assert_owner()
