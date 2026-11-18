@@ -30,6 +30,7 @@ A Bambu Lab printer dashboard prototype for ESP32-P4 / PetUI, with offline build
 | Bambu Cloud HTTP、云 MQTT 及前台采集入口 | 代码与离线传输测试已实现；[使用说明](docs/CLOUD-COLLECTOR.md)，真实账号/云/固件仍pending |
 | 私有手机号／邮箱登录、系统凭据库与本地退出登录 | 已实现；国区手机号密码／短信验证码支持见[验证记录](docs/PHONE-LOGIN-VERIFICATION.md)，真实账号与密钥库仍待验证 |
 | 本地引导窗口、设置保存与监控首页 | 已实现；[使用说明](docs/SETUP-WIZARD.md)，真实 Tk 合成交互通过；真实云与密钥库待联调 |
+| macOS 后台托盘、localhost 完整登录/设置 | 已实现；原生托盘、独立进程、Chromium 合成流程通过；[使用说明](docs/LOCAL-SERVICE.md)，真实云和 launchd 登录恢复仍待验证 |
 | 自定义界面的实时变量下发 | [M0审计](docs/M0-HOST-AUDIT.md)已完成可取得证据核实；生产宿主源码与设备能力待取得 |
 | 打印机本地 MQTT | 后续计划 |
 
@@ -72,7 +73,7 @@ python -m bambu_monitor replay examples/replay.synthetic.ndjson
 
 回放每行输出带 `input_class=synthetic` 的快照与PC诊断，不联网、不发送到屏幕。完整输入格式、profile与生命周期边界见 [离线核心](docs/OFFLINE-CORE.md)。
 
-云采集现在提供本地引导窗口：安装 cloud 依赖后，用带 Tk 的 Python 执行 `python -m bambu_monitor setup`。依次选择区域、登录、选择打印机并保存，日常首页可手动启停；本机可双击 [start-monitor.command](start-monitor.command)。安装与流程见[本地向导](docs/SETUP-WIZARD.md)。需要 NDJSON 时仍可在终端运行 `python -m bambu_monitor collect your-provider.toml --duration 60`。本轮未使用真实账号；支持分支和限制见[云采集使用](docs/CLOUD-COLLECTOR.md)，离线传输证据见[M2/M3验证](docs/M2-M3-VERIFICATION.md)。
+macOS 建议安装 `python -m pip install -e '.[cloud,tray]'`，然后双击 [start-monitor.command](start-monitor.command) 或运行 `python -m bambu_monitor service --background`。采集器以托盘进程留在后台，通过 `127.0.0.1:8765` 浏览器页面完成登录、验证码、设备选择、保存和启停；从托盘打开设置页，关闭网页后继续采集。可选登录时启动、自动恢复及安全边界见[后台服务](docs/LOCAL-SERVICE.md)。旧 Tk `setup` 和 NDJSON `collect` 入口保留，见[本地向导](docs/SETUP-WIZARD.md)与[云采集](docs/CLOUD-COLLECTOR.md)。真实云账号和设备显示仍待联调。
 
 Windows PowerShell 使用 `.venv\Scripts\Activate.ps1` 激活；也可直接调用虚拟环境里的 Python。
 

@@ -21,9 +21,13 @@ Issues = "https://github.com/UpKiry/bambu-monitor/issues"
 [project.optional-dependencies]
 dev = ["jsonschema>=4.23,<5", "rfc3339-validator>=0.1.4,<0.2"]
 cloud = ["paho-mqtt==2.1.0", "keyring>=25.7,<26"]
+tray = ["pystray==0.19.5; sys_platform == 'darwin'", "pyobjc-framework-Quartz>=7.0; sys_platform == 'darwin'"]
 
 [project.scripts]
 bambu-monitor = "bambu_monitor.cli:main"
+
+[tool.setuptools.package-data]
+bambu_monitor = ["webui/*.html", "webui/*.js", "webui/*.css"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

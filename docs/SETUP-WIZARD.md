@@ -10,7 +10,7 @@
 .venv-gui/bin/python -m bambu_monitor setup
 ```
 
-本机已经创建带 Tk 9 的 `.venv-gui` 并安装项目 `dev,cloud` 依赖，也可以在 Finder 双击项目根目录的 [start-monitor.command](../start-monitor.command)。启动器只选择本项目中带 Tk 的虚拟环境，不修改系统 Python，不安装开机任务。
+本机已经创建带 Tk 9 的 `.venv-gui` 并安装项目 `dev,cloud` 依赖。此命令保留旧 Tk 窗口；根目录 [start-monitor.command](../start-monitor.command) 现已改为启动 macOS 后台托盘和浏览器设置，见[服务说明](LOCAL-SERVICE.md)。两者共用普通设置格式，不要同时采集同一设备。
 
 其他电脑需要 Python 3.11+、Tk 和项目 cloud 依赖。先确认所用 Python 能执行 `python -c 'import tkinter'`；再用该解释器创建虚拟环境并安装：
 

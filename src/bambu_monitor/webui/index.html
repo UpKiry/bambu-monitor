@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Bambu Monitor · 本机设置</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header><div class="brand">BAMBU MONITOR</div><span class="local">本机采集服务</span></header>
+  <h1>让采集留在后台</h1>
+  <p class="intro">在这里连接 Bambu 账号、选择打印机。关闭网页后，托盘中的服务会继续运行。</p>
+  <section class="card" aria-labelledby="status-title">
+    <div class="section-title"><h2 id="status-title">运行概览</h2><span id="phase" class="badge">连接中</span></div>
+    <div class="status-grid"><div><label>电脑采集</label><strong id="service-state">正在连接本机服务…</strong></div><div><label>目标遥测</label><strong id="telemetry">等待数据</strong></div></div>
+    <div id="metrics" class="metrics"></div>
+    <p id="notice" role="status" class="notice"></p>
+    <div class="actions"><button id="start" data-action="start">开始监控</button><button id="stop" data-action="stop" class="secondary">停止监控</button></div>
+  </section>
+  <section class="card" aria-labelledby="setup-title"><div class="section-title"><h2 id="setup-title">账号与打印机</h2><span id="region-label" class="muted"></span></div><div id="wizard"></div></section>
+  <section id="settings" class="card" aria-labelledby="settings-title" hidden>
+    <h2 id="settings-title">采集设置</h2>
+    <p class="muted">目标遥测阈值用于判断设备活跃证据；各字段的有效性仍由采集核心分别判断。</p>
+    <div class="fields"><div><label for="live">目标遥测阈值（秒）</label><input id="live" type="number" min="1" max="3600" step="any"></div><div><label for="initial">重连初始等待（秒）</label><input id="initial" type="number" min="1" max="3600" step="any"></div><div><label for="maximum">重连最大等待（秒）</label><input id="maximum" type="number" min="1" max="3600" step="any"></div></div>
+    <label class="check"><input id="jitter" type="checkbox"> 使用随机抖动，避免密集重连</label>
+    <button data-action="save-settings">保存采集设置</button>
+  </section>
+  <footer>本机访问 · 云端只读采集 · 设备屏幕尚未接入<br>账号凭据只经本机端口进入采集器，令牌保存在系统钥匙串或本次内存中。云端连接、真实字段和设备显示需分别验收。</footer>
+</main>
+</body></html>

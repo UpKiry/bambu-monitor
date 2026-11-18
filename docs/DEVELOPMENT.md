@@ -12,7 +12,7 @@ python -m pip install -e '.[dev]'
 
 Windows PowerShell 激活：`.venv\Scripts\Activate.ps1`。也可始终直接使用虚拟环境里的 Python，不依赖激活。打包需要本机 Pet Manager 维护的 PetUI CLI，检查/构建/预览不需要启动 Pet Manager。
 
-`pyproject.toml` 管理依赖范围；已包含可运行的 `bambu-monitor` 离线CLI与 `src/` 核心，命令见 [离线操作](OFFLINE-CORE.md)。`pip install` 不会启动服务或登录账号。新增可选cloud依赖与 `login/collect/logout` 入口见 [云采集使用](CLOUD-COLLECTOR.md)；真实账号、云兼容与密钥库实测仍pending。离线核心和HTTP用标准库；云MQTT固定Paho2.1.0，原生凭据库用keyring，既有预览依赖Pillow。没有锁定所有传递依赖，CI安装的是范围内版本。真实采集部署前再确定网络/密钥库依赖、分发和锁定策略。
+`pyproject.toml` 管理依赖范围；已包含可运行的 `bambu-monitor` 离线CLI与 `src/` 核心，命令见 [离线操作](OFFLINE-CORE.md)。`pip install` 不会启动服务或登录账号。新增可选cloud依赖与 `login/collect/logout` 入口见 [云采集使用](CLOUD-COLLECTOR.md)；真实账号、云兼容与密钥库实测仍pending。macOS 托盘服务使用可选 `tray` extra（pystray macOS backend）；HTTP服务、HTML浏览器配置均无额外Web框架依赖。`python -m bambu_monitor service` 不自动注册开机启动；只有显式 `--install-launch-agent` 会改写当前用户LaunchAgents并启动服务。离线核心和HTTP用标准库；云MQTT固定Paho2.1.0，原生凭据库用keyring，既有预览依赖Pillow。没有锁定所有传递依赖，CI安装的是范围内版本。真实采集部署前再确定网络/密钥库依赖、分发和锁定策略。
 
 ## 统一入口和输出
 

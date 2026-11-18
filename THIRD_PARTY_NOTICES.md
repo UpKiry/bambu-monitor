@@ -13,6 +13,8 @@
 | rfc3339-validator | 测试中的日期时间格式校验 | [rfc3339-validator LICENSE](https://github.com/naimetti/rfc3339-validator/blob/master/LICENSE) |
 | Paho MQTT 2.1.0 | 可选cloud extra；标准TLS云MQTT客户端 | [固定双许可声明 EPL-2.0 / EDL-1.0](https://github.com/eclipse-paho/paho.mqtt.python/blob/af64a4365c6ac5a7a4d339e7b00f44df91353b35/LICENSE.txt)；作为依赖使用，分发须保留原发行物许可 |
 | keyring 25.x | 可选cloud extra；明确原生系统凭据后端 | [keyring 25.7.0发行页](https://pypi.org/project/keyring/25.7.0/)；本机发行包许可实读为MIT，分发保留原许可；不启用第三方明文backend |
+| pystray 0.19.5 | 可选tray extra；macOS 原生菜单栏图标 | [发行页 LGPLv3](https://pypi.org/project/pystray/0.19.5/)；仅作为未修改的动态 Python 依赖，不打入设备组件包 |
+| PyObjC / Quartz / Cocoa | 可选tray extra；macOS 主线程计时器与桥接 | [PyObjC 仓库许可 MIT](https://github.com/ronaldoussoren/pyobjc/blob/main/LICENSE.txt)；分发须保留原依赖许可 |
 | PetUI / Pet Manager | 可选组件打包、校验和设备宿主 | 外部工具，使用者单独安装并遵循其许可；本仓库不分发工具实现 |
 
 ## 字体与预览
@@ -25,6 +27,7 @@
 
 下列项目用于了解云端协议。本仓库当前没有引入它们的采集器实现，参考文档也不等于运行时依赖。
 
+- [BambuHelper](https://github.com/Keralots/BambuHelper)：MIT；参考公开 README 的浏览器登录/设备选择/配置组织流程，未复制源码或素材，macOS 托盘由本项目独立实现。
 - [ha-bambulab](https://github.com/greghesp/ha-bambulab)：MIT；如后续复用代码，须保留其版权与许可证。
 - [OpenBambuAPI](https://github.com/Doridian/OpenBambuAPI)：GFDL 1.3；本项目对协议事实作归纳并链接出处，没有将上游文档整体复制进仓库。
 
